@@ -1,12 +1,12 @@
 <?php
 
-namespace Lagdo\Adminer\Driver\MySql\Tests;
+namespace Lagdo\DbAdmin\Driver\MySql\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Exception;
 
 /**
- * @covers Lagdo\Adminer\Driver\PgSql\Server
+ * @covers Lagdo\DbAdmin\Driver\PgSql\Server
  */
 final class ServerTest extends TestCase
 {

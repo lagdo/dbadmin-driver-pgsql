@@ -1,8 +1,8 @@
 <?php
 
-namespace Lagdo\Adminer\Driver\PgSql;
+namespace Lagdo\DbAdmin\Driver\PgSql;
 
-use Lagdo\Adminer\Driver\Db\Server as AbstractServer;
+use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 
 class Server extends AbstractServer
 {

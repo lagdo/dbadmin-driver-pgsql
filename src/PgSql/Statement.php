@@ -1,6 +1,6 @@
 <?php
 
-namespace Lagdo\Adminer\Driver\PgSql\PgSql;
+namespace Lagdo\DbAdmin\Driver\PgSql\PgSql;
 
 use stdClass;
 

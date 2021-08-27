@@ -1,8 +1,8 @@
 <?php
 
-namespace Lagdo\Adminer\Driver\PgSql\Pdo;
+namespace Lagdo\DbAdmin\Driver\PgSql\Pdo;
 
-use Lagdo\Adminer\Driver\Db\Pdo\Connection as PdoConnection;
+use Lagdo\DbAdmin\Driver\Db\Pdo\Connection as PdoConnection;
 
 /**
  * PostgreSQL driver to be used with the pdo_pgsql PHP extension.
