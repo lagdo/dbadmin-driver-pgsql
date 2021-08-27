@@ -9,9 +9,8 @@
         }
     ],
     "homepage": "https://github.com/lagdo/dbadmin-driver-pgsql",
-    "license": "Apache 2.0",
-    "keywords": ["Adminer", "PostgreSQL", "MySQL", "Oracle", "MsSQL", "Sqlite",
-        "MondoDb", "ElasticSearch", "Sql", "Dashboard", "Jaxon", "Ajax"],
+    "license": "Apache-2.0",
+    "keywords": ["Adminer", "Database", "Admin", "Dashboard", "Sql", "PostgreSQL"],
     "support": {
         "issues": "https://github.com/lagdo/dbadmin-driver-pgsql/issues",
         "source": "https://github.com/lagdo/dbadmin-driver-pgsql"
@@ -24,7 +23,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Lagdo\\Adminer\\Driver\\PgSql": "src/"
+            "Lagdo\\Adminer\\Driver\\PgSql\\": "src/"
         },
         "files": [
             "src/start.php"
