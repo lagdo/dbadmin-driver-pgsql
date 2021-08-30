@@ -60,11 +60,18 @@ class Connection extends AbstractConnection
         }
         restore_error_handler();
         if ($this->client) {
-            $version = pg_version($this->client);
-            $this->server_info = $version["server"];
             pg_set_client_encoding($this->client, "UTF8");
         }
         return (bool) $this->client;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getServerInfo()
+    {
+        $version = pg_version($this->client);
+        return $version["server"];
     }
 
     /**
