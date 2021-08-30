@@ -47,7 +47,7 @@ class Server extends AbstractServer
 
         list($server, $options) = $this->db->getOptions();
         if (!$this->connection->open($server, $options)) {
-            return $this->connection->error;
+            return $this->util->error();
         }
 
         if ($this->min_version(9, 0)) {

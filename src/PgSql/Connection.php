@@ -36,7 +36,7 @@ class Connection extends AbstractConnection
             $error = html_entity_decode(strip_tags($error));
         }
         $error = preg_replace('~^[^:]*: ~', '', $error);
-        $this->error = $error;
+        $this->db->setError($error);
     }
 
     /**
@@ -128,12 +128,12 @@ class Connection extends AbstractConnection
     public function query($query, $unbuffered = false)
     {
         $result = @pg_query($this->client, $query);
-        $this->error = "";
+        $this->db->setError();
         if (!$result) {
-            $this->error = pg_last_error($this->client);
+            $this->db->setError(pg_last_error($this->client));
             $return = false;
         } elseif (!pg_num_fields($result)) {
-            $this->affected_rows = pg_affected_rows($result);
+            $this->db->setAffectedRows(pg_affected_rows($result));
             $return = true;
         } else {
             $return = new Statement($result);
