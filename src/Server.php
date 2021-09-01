@@ -106,14 +106,9 @@ class Server extends AbstractServer
     {
         $query = "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = current_schema()";
         if ($this->support('materializedview')) {
-            $query .= "
-UNION ALL
-SELECT matviewname, 'MATERIALIZED VIEW'
-FROM pg_matviews
-WHERE schemaname = current_schema()";
+            $query .= " UNION ALL SELECT matviewname, 'MATERIALIZED VIEW' FROM pg_matviews WHERE schemaname = current_schema()";
         }
-        $query .= "
-ORDER BY 1";
+        $query .= " ORDER BY 1";
         return $this->db->keyValues($query);
     }
 
@@ -125,18 +120,19 @@ ORDER BY 1";
     public function tableStatus($name = "", $fast = false)
     {
         $return = [];
-        foreach ($this->db->rows(
-            "SELECT c.relname AS \"Name\", CASE c.relkind
-WHEN 'r' THEN 'table' WHEN 'm' THEN 'materialized view' ELSE 'view' END AS \"Engine\",
-pg_relation_size(c.oid) AS \"Data_length\",
-pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\",
-obj_description(c.oid, 'pg_class') AS \"Comment\", " .
-($this->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
-" AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c
-JOIN pg_namespace n ON(n.nspname = current_schema() AND n.oid = c.relnamespace)
-WHERE relkind IN ('r', 'm', 'v', 'f', 'p')
-" . ($name != "" ? "AND relname = " . $this->quote($name) : "ORDER BY relname")
-        ) as $row) { //! Index_length, Auto_increment
+        $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
+            "WHEN 'r' THEN 'table' WHEN 'm' THEN 'materialized view' ELSE 'view' END AS \"Engine\", " .
+            "pg_relation_size(c.oid) AS \"Data_length\", " .
+            "pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\", " .
+            "obj_description(c.oid, 'pg_class') AS \"Comment\", " .
+            ($this->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
+            " AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c JOIN pg_namespace n " .
+            "ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
+            "WHERE relkind IN ('r', 'm', 'v', 'f', 'p') " .
+            ($name != "" ? "AND relname = " . $this->quote($name) : "ORDER BY relname");
+        foreach ($this->db->rows($query) as $row)
+        {
+            //! Index_length, Auto_increment
             $return[$row["Name"]] = $row;
         }
         return ($name != "" ? $return[$name] : $return);
@@ -162,20 +158,15 @@ WHERE relkind IN ('r', 'm', 'v', 'f', 'p')
 
         $identity_column = $this->minVersion(10) ? 'a.attidentity' : '0';
 
-        foreach ($this->db->rows(
-            "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type, " .
+        $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type, " .
             "pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int, " .
-            "col_description(c.oid, a.attnum) AS comment, $identity_column AS identity
-FROM pg_class c
-JOIN pg_namespace n ON c.relnamespace = n.oid
-JOIN pg_attribute a ON c.oid = a.attrelid
-LEFT JOIN pg_attrdef d ON c.oid = d.adrelid AND a.attnum = d.adnum
-WHERE c.relname = " . $this->quote($table) . "
-AND n.nspname = current_schema()
-AND NOT a.attisdropped
-AND a.attnum > 0
-ORDER BY a.attnum"
-        ) as $row) {
+            "col_description(c.oid, a.attnum) AS comment, $identity_column AS identity FROM pg_class c " .
+            "JOIN pg_namespace n ON c.relnamespace = n.oid JOIN pg_attribute a ON c.oid = a.attrelid " .
+            "LEFT JOIN pg_attrdef d ON c.oid = d.adrelid AND a.attnum = d.adnum WHERE c.relname = " .
+            $this->quote($table) .
+            " AND n.nspname = current_schema() AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
+        foreach ($this->db->rows($query) as $row)
+        {
             //! collation, primary
             preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $row["full_type"], $match);
             list(, $type, $length, $row["length"], $addon, $array) = $match;
@@ -240,13 +231,12 @@ ORDER BY a.attnum"
     public function foreignKeys($table)
     {
         $return = [];
-        foreach ($this->db->rows("SELECT conname,
-condeferrable::int AS deferrable, pg_get_constraintdef(oid) AS definition
-FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc
-INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace)
-WHERE pc.relname = " . $this->quote($table) . " AND pn.nspname = current_chema())
-AND contype = 'f'::char
-ORDER BY conkey, conname") as $row) {
+        $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid) " .
+            "AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc " .
+            "INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = " .
+            $this->quote($table) .
+            " AND pn.nspname = current_chema()) AND contype = 'f'::char ORDER BY conkey, conname";
+        foreach ($this->db->rows($query) as $row) {
             if (preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
                 $match1 = $match[1] ?? '';
                 $match2 = $match[2] ?? '';
@@ -274,16 +264,15 @@ ORDER BY conkey, conname") as $row) {
     public function constraints($table)
     {
         $return = [];
-        foreach ($this->db->rows("SELECT conname, consrc
-FROM pg_catalog.pg_constraint
-INNER JOIN pg_catalog.pg_namespace ON pg_constraint.connamespace = pg_namespace.oid
-INNER JOIN pg_catalog.pg_class ON pg_constraint.conrelid = pg_class.oid
-AND pg_constraint.connamespace = pg_class.relnamespace
-WHERE pg_constraint.contype = 'c'
-AND conrelid != 0 -- handle only CONSTRAINTs here, not TYPES
-AND nspname = current_schema()
-AND relname = " . $this->quote($table) . "
-ORDER BY connamespace, conname") as $row) {
+        $query = "SELECT conname, consrc FROM pg_catalog.pg_constraint " .
+            "INNER JOIN pg_catalog.pg_namespace ON pg_constraint.connamespace = pg_namespace.oid " .
+            "INNER JOIN pg_catalog.pg_class ON pg_constraint.conrelid = pg_class.oid " .
+            "AND pg_constraint.connamespace = pg_class.relnamespace WHERE pg_constraint.contype = 'c' " .
+            // "-- handle only CONSTRAINTs here, not TYPES " .
+            "AND conrelid != 0  AND nspname = current_schema() AND relname = " .
+            $this->quote($table) . "ORDER BY connamespace, conname";
+        foreach ($this->db->rows($query) as $row)
+        {
             $return[$row['conname']] = $row['consrc'];
         }
         return $return;
@@ -291,10 +280,12 @@ ORDER BY connamespace, conname") as $row) {
 
     public function view($name)
     {
-        return array("select" => trim($this->connection->result("SELECT pg_get_viewdef(" .
-            $this->connection->result("SELECT oid FROM pg_class WHERE relnamespace = " .
-            "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = " .
-            $this->quote($name)) . ")")));
+        return [
+            "select" => trim($this->connection->result("SELECT pg_get_viewdef(" .
+                $this->connection->result("SELECT oid FROM pg_class WHERE relnamespace = " .
+                "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = " .
+                $this->quote($name)) . ")"))
+        ];
     }
 
     public function collations()
@@ -339,7 +330,7 @@ ORDER BY connamespace, conname") as $row) {
     public function renameDatabase($name, $collation)
     {
         //! current database cannot be renamed
-        return $this->db->queries("ALTER DATABASE " . $this->escapeId($this->currentDatabase()) .
+        return $this->db->queries("ALTER DATABASE " . $this->escapeId($this->selectedDatabase()) .
             " RENAME TO " . $this->escapeId($name));
     }
 
@@ -411,14 +402,15 @@ ORDER BY connamespace, conname") as $row) {
             if ($val[0] != "INDEX") {
                 //! descending UNIQUE indexes results in syntax error
                 $create[] = (
-                    $val[2] == "DROP"
-                    ? "\nDROP CONSTRAINT " . $this->escapeId($val[1])
-                    : "\nADD" . ($val[1] != "" ? " CONSTRAINT " . $this->escapeId($val[1]) : "") . " $val[0] " . ($val[0] == "PRIMARY" ? "KEY " : "") . "(" . implode(", ", $val[2]) . ")"
+                    $val[2] == "DROP" ? "\nDROP CONSTRAINT " . $this->escapeId($val[1]) :
+                    "\nADD" . ($val[1] != "" ? " CONSTRAINT " . $this->escapeId($val[1]) : "") .
+                    " $val[0] " . ($val[0] == "PRIMARY" ? "KEY " : "") . "(" . implode(", ", $val[2]) . ")"
                 );
             } elseif ($val[2] == "DROP") {
                 $drop[] = $this->escapeId($val[1]);
             } else {
-                $queries[] = "CREATE INDEX " . $this->escapeId($val[1] != "" ? $val[1] : uniqid($table . "_")) . " ON " . $this->table($table) . " (" . implode(", ", $val[2]) . ")";
+                $queries[] = "CREATE INDEX " . $this->escapeId($val[1] != "" ? $val[1] : uniqid($table . "_")) .
+                    " ON " . $this->table($table) . " (" . implode(", ", $val[2]) . ")";
             }
         }
         if ($create) {
@@ -479,20 +471,22 @@ ORDER BY connamespace, conname") as $row) {
         if ($table === null) {
             $table = $this->util->input()->getTable();
         }
-        $rows = $this->db->rows('SELECT t.trigger_name AS "Trigger", t.action_timing AS "Timing", ' .
+        $query = 'SELECT t.trigger_name AS "Trigger", t.action_timing AS "Timing", ' .
             '(SELECT STRING_AGG(event_manipulation, \' OR \') FROM information_schema.triggers ' .
-            'WHERE event_object_table = t.event_object_table AND trigger_name = t.trigger_name ) AS ' .
-            '"Events", t.event_manipulation AS "Event", \'FOR EACH \' || t.action_orientation AS ' .
-            '"Type", t.action_statement AS "Statement" FROM information_schema.triggers t WHERE ' .
-            't.event_object_table = ' . $this->quote($table) . ' AND t.trigger_name = ' . $this->quote($name));
+            'WHERE event_object_table = t.event_object_table AND trigger_name = t.trigger_name ) AS "Events", ' .
+            't.event_manipulation AS "Event", \'FOR EACH \' || t.action_orientation AS "Type", ' .
+            't.action_statement AS "Statement" FROM information_schema.triggers t WHERE t.event_object_table = ' .
+            $this->quote($table) . ' AND t.trigger_name = ' . $this->quote($name);
+        $rows = $this->db->rows($query);
         return reset($rows);
     }
 
     public function triggers($table)
     {
         $return = [];
-        foreach ($this->db->rows("SELECT * FROM information_schema.triggers " .
-            "WHERE trigger_schema = current_schema() AND event_object_table = " . $this->quote($table)) as $row) {
+        $query = "SELECT * FROM information_schema.triggers WHERE trigger_schema = current_schema() " .
+            "AND event_object_table = " . $this->quote($table);
+        foreach ($this->db->rows($query) as $row) {
             $return[$row["trigger_name"]] = array($row["action_timing"], $row["event_manipulation"]);
         }
         return $return;
@@ -509,24 +503,25 @@ ORDER BY connamespace, conname") as $row) {
 
     public function routine($name, $type)
     {
-        $rows = $this->db->rows('SELECT routine_definition AS definition, LOWER(external_language) AS language, *
-FROM information_schema.routines
-WHERE routine_schema = current_schema() AND specific_name = ' . $this->quote($name));
+        $query = 'SELECT routine_definition AS definition, LOWER(external_language) AS language, * ' .
+            'FROM information_schema.routines WHERE routine_schema = current_schema() ' .
+            'AND specific_name = ' . $this->quote($name);
+        $rows = $this->db->rows($query);
         $return = $rows[0];
         $return["returns"] = array("type" => $return["type_udt_name"]);
-        $return["fields"] = $this->db->rows('SELECT parameter_name AS field, data_type AS type,
-character_maximum_length AS length, parameter_mode AS inout
-FROM information_schema.parameters
-WHERE specific_schema = current_schema() AND specific_name = ' . $this->quote($name) . '
-ORDER BY ordinal_position');
+        $query = 'SELECT parameter_name AS field, data_type AS type, character_maximum_length AS length, ' .
+            'parameter_mode AS inout FROM information_schema.parameters WHERE specific_schema = current_schema() ' .
+            'AND specific_name = ' . $this->quote($name) . ' ORDER BY ordinal_position';
+        $return["fields"] = $this->db->rows($query);
         return $return;
     }
 
     public function routines()
     {
-        return $this->db->rows('SELECT specific_name AS "SPECIFIC_NAME",
-routine_type AS "ROUTINE_TYPE", routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER"
-FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME');
+        $query = 'SELECT specific_name AS "SPECIFIC_NAME", routine_type AS "ROUTINE_TYPE", ' .
+            'routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER" ' .
+            'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
+        return $this->db->rows($query);
     }
 
     public function routineLanguages()
@@ -555,9 +550,9 @@ FROM information_schema.routines WHERE routine_schema = current_schema() ORDER B
 
     public function countRows($tableStatus, $where)
     {
-        if (preg_match("~ rows=([0-9]+)~",
-            $this->connection->result("EXPLAIN SELECT * FROM " . $this->escapeId($tableStatus["Name"]) .
-            ($where ? " WHERE " . implode(" AND ", $where) : "")), $regs ))
+        $query = "EXPLAIN SELECT * FROM " . $this->escapeId($tableStatus["Name"]) .
+            ($where ? " WHERE " . implode(" AND ", $where) : "");
+        if (preg_match("~ rows=([0-9]+)~", $this->connection->result($query), $regs ))
         {
             return $regs[1];
         }
@@ -566,13 +561,10 @@ FROM information_schema.routines WHERE routine_schema = current_schema() ORDER B
 
     public function userTypes()
     {
-        return $this->db->values(
-            "SELECT typname
-FROM pg_type
-WHERE typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema())
-AND typtype IN ('b','d','e')
-AND typelem = 0"
-        );
+        $query = "SELECT typname FROM pg_type WHERE typnamespace = " .
+            "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) " .
+            "AND typtype IN ('b','d','e') AND typelem = 0";
+        return $this->db->values($query);
     }
 
     public function schemas()
@@ -613,8 +605,8 @@ AND typelem = 0"
 
         foreach ($fkeys as $fkey_name => $fkey) {
             $return .= "ALTER TABLE ONLY " . $this->escapeId($status['nspname']) . "." .
-            $this->escapeId($status['Name']) . " ADD CONSTRAINT " . $this->escapeId($fkey_name) .
-            " $fkey[definition] " . ($fkey['deferrable'] ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
+                $this->escapeId($status['Name']) . " ADD CONSTRAINT " . $this->escapeId($fkey_name) .
+                " $fkey[definition] " . ($fkey['deferrable'] ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
         }
 
         return ($return ? "$return\n" : $return);
