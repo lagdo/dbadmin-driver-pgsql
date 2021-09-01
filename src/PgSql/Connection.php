@@ -32,7 +32,7 @@ class Connection extends AbstractConnection
 
     public function _error($errno, $error)
     {
-        if ($this->util->ini_bool("html_errors")) {
+        if ($this->util->iniBool("html_errors")) {
             $error = html_entity_decode(strip_tags($error));
         }
         $error = preg_replace('~^[^:]*: ~', '', $error);
@@ -47,7 +47,7 @@ class Connection extends AbstractConnection
         $username = $options['username'];
         $password = $options['password'];
 
-        $db = $this->server->current_db();
+        $db = $this->server->currentDatabase();
         set_error_handler(array($this, '_error'));
         $this->_string = "host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
             "' user='" . addcslashes($username, "'\\") . "' password='" . addcslashes($password, "'\\") . "'";
@@ -102,12 +102,12 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function select_db($database)
+    public function selectDatabase($database)
     {
-        if ($database == $this->server->current_db()) {
+        if ($database == $this->server->currentDatabase()) {
             return $this->_database;
         }
-        $return = @pg_connect("$this->_string dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);
+        $return = @pg_connect("{$this->_string} dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);
         if ($return) {
             $this->client = $return;
         }
@@ -119,7 +119,7 @@ class Connection extends AbstractConnection
      */
     public function close()
     {
-        $this->client = @pg_connect("$this->_string dbname='postgres'");
+        $this->client = @pg_connect("{$this->_string} dbname='postgres'");
     }
 
     /**
@@ -148,7 +148,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function multi_query($query)
+    public function multiQuery($query)
     {
         return $this->_result = $this->query($query);
     }
@@ -156,7 +156,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function store_result($result = null)
+    public function storedResult($result = null)
     {
         return $this->_result;
     }
@@ -164,7 +164,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function next_result()
+    public function nextResult()
     {
         // PgSQL extension doesn't support multiple results
         return false;
