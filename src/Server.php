@@ -9,7 +9,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function getName()
+    public function name()
     {
         return "PostgreSQL";
     }
@@ -39,7 +39,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function getConnection()
+    public function connection()
     {
         if (!$this->connection) {
             return null;
