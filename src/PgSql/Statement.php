@@ -2,9 +2,11 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\PgSql;
 
+use Lagdo\DbAdmin\Driver\Db\StatementInterface;
+
 use stdClass;
 
-class Statement
+class Statement implements StatementInterface
 {
     /**
      * Undocumented variable
@@ -33,17 +35,17 @@ class Statement
         $this->numRows = pg_num_rows($result);
     }
 
-    public function fetch_assoc()
+    public function fetchAssoc()
     {
         return pg_fetch_assoc($this->result);
     }
 
-    public function fetch_row()
+    public function fetchRow()
     {
         return pg_fetch_row($this->result);
     }
 
-    public function fetch_field()
+    public function fetchField()
     {
         $column = $this->offset++;
         $return = new stdClass;
