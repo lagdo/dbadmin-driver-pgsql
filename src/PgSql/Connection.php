@@ -71,7 +71,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function getServerInfo()
+    public function serverInfo()
     {
         $version = pg_version($this->client);
         return $version["server"];
@@ -153,7 +153,7 @@ class Connection extends AbstractConnection
      */
     public function multiQuery($query)
     {
-        return $this->_result = $this->query($query);
+        return $this->result = $this->query($query);
     }
 
     /**
@@ -161,7 +161,7 @@ class Connection extends AbstractConnection
      */
     public function storedResult($result = null)
     {
-        return $this->_result;
+        return $this->result;
     }
 
     /**
@@ -179,10 +179,10 @@ class Connection extends AbstractConnection
     public function result($query, $field = 0)
     {
         $result = $this->query($query);
-        if (!$result || !$result->num_rows) {
+        if (!$result || !$result->numRows) {
             return false;
         }
-        return pg_fetch_result($result->_result, 0, $field);
+        return pg_fetch_result($result->result, 0, $field);
     }
 
     /**

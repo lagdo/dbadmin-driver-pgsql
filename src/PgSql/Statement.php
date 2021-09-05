@@ -11,54 +11,54 @@ class Statement
      *
      * @var object
      */
-    public $_result;
+    public $result;
 
     /**
      * Undocumented variable
      *
      * @var int
      */
-    public $_offset = 0;
+    public $offset = 0;
 
     /**
      * Undocumented variable
      *
      * @var int
      */
-    public $num_rows;
+    public $numRows;
 
     public function __construct($result)
     {
-        $this->_result = $result;
-        $this->num_rows = pg_num_rows($result);
+        $this->result = $result;
+        $this->numRows = pg_num_rows($result);
     }
 
     public function fetch_assoc()
     {
-        return pg_fetch_assoc($this->_result);
+        return pg_fetch_assoc($this->result);
     }
 
     public function fetch_row()
     {
-        return pg_fetch_row($this->_result);
+        return pg_fetch_row($this->result);
     }
 
     public function fetch_field()
     {
-        $column = $this->_offset++;
+        $column = $this->offset++;
         $return = new stdClass;
         if (function_exists('pg_field_table')) {
-            $return->orgtable = pg_field_table($this->_result, $column);
+            $return->orgtable = pg_field_table($this->result, $column);
         }
-        $return->name = pg_field_name($this->_result, $column);
+        $return->name = pg_field_name($this->result, $column);
         $return->orgname = $return->name;
-        $return->type = pg_field_type($this->_result, $column);
+        $return->type = pg_field_type($this->result, $column);
         $return->charsetnr = ($return->type == "bytea" ? 63 : 0); // 63 - binary
         return $return;
     }
 
     public function __destruct()
     {
-        pg_free_result($this->_result);
+        pg_free_result($this->result);
     }
 }
