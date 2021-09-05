@@ -17,41 +17,36 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    protected function createConnection()
+    public function connect()
     {
-        if (($this->connection)) {
-            // Do not create if it already exists
-            return;
-        }
+        // if (($this->connection)) {
+        //     // Do not create if it already exists
+        //     return;
+        // }
 
+        $connection = null;
         if (extension_loaded("pgsql")) {
-            $this->connection = new PgSql\Connection($this->db, $this->util, $this, 'PgSQL');
+            $connection = new PgSql\Connection($this->db, $this->util, $this, 'PgSQL');
         }
         elseif (extension_loaded("pdo_pgsql")) {
-            $this->connection = new Pdo\Connection($this->db, $this->util, $this, 'PDO_PgSQL');
+            $connection = new Pdo\Connection($this->db, $this->util, $this, 'PDO_PgSQL');
+        }
+        else {
+            throw new AuthException($this->util->lang('No package installed to connect to a PostgreSQL server.'));
         }
 
-        if($this->connection !== null) {
-            $this->driver = new Driver($this->db, $this->util, $this, $this->connection);
-        }
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function connection()
-    {
-        if (!$this->connection) {
-            return null;
+        if ($this->connection === null) {
+            $this->connection = $connection;
+            $this->driver = new Driver($this->db, $this->util, $this, $connection);
         }
 
         list($server, $options) = $this->db->options();
-        if (!$this->connection->open($server, $options)) {
-            return $this->util->error();
+        if (!$connection->open($server, $options)) {
+            throw new AuthException($this->util->error());
         }
 
         if ($this->minVersion(9, 0)) {
-            $this->connection->query("SET application_name = 'Adminer'");
+            $connection->query("SET application_name = 'Adminer'");
             if ($this->minVersion(9.2, 0)) {
                 $this->structuredTypes[$this->util->lang('Strings')][] = "json";
                 $this->types["json"] = 4294967295;
@@ -61,7 +56,8 @@ class Server extends AbstractServer
                 }
             }
         }
-        return $this->connection;
+
+        return $connection;
     }
 
     /**

@@ -47,22 +47,25 @@ class Connection extends AbstractConnection
         $username = $options['username'];
         $password = $options['password'];
 
-        $db = $this->server->selectedDatabase();
+        $database = $this->server->selectedDatabase();
         set_error_handler(array($this, '_error'));
         $this->_string = "host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
             "' user='" . addcslashes($username, "'\\") . "' password='" . addcslashes($password, "'\\") . "'";
-        $this->client = @pg_connect("$this->_string dbname='" .
-            ($db != "" ? addcslashes($db, "'\\") : "postgres") . "'", PGSQL_CONNECT_FORCE_NEW);
-        if (!$this->client && $db != "") {
+        $this->client = @pg_connect("{$this->_string} dbname='" .
+            ($database != "" ? addcslashes($database, "'\\") : "postgres") . "'", PGSQL_CONNECT_FORCE_NEW);
+        if (!$this->client && $database != "") {
             // try to connect directly with database for performance
             $this->_database = false;
-            $this->client = @pg_connect("$this->_string dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
+            $this->client = @pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
         }
         restore_error_handler();
-        if ($this->client) {
-            pg_set_client_encoding($this->client, "UTF8");
+
+        if (!$this->client) {
+            return false;
         }
-        return (bool) $this->client;
+
+        pg_set_client_encoding($this->client, "UTF8");
+        return true;
     }
 
     /**
@@ -107,11 +110,11 @@ class Connection extends AbstractConnection
         if ($database == $this->server->selectedDatabase()) {
             return $this->_database;
         }
-        $return = @pg_connect("{$this->_string} dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);
-        if ($return) {
-            $this->client = $return;
+        $client = @pg_connect("{$this->_string} dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);
+        if ($client) {
+            $this->client = $client;
         }
-        return $return;
+        return $client;
     }
 
     /**
