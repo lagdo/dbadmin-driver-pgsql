@@ -40,7 +40,7 @@ class Driver extends AbstractDriver
     public function convertSearch($idf, $val, $field)
     {
         return (preg_match('~char|text' . (!preg_match('~LIKE~', $val["op"]) ?
-            '|date|time(stamp)?|boolean|uuid|' . $this->db->numberRegex() : '') . '~', $field["type"]) ?
+            '|date|time(stamp)?|boolean|uuid|' . $this->db->numberRegex() : '') . '~', $field->type) ?
             $idf : "CAST($idf AS text)"
         );
     }

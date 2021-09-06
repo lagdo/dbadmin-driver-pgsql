@@ -3,6 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
+use Lagdo\DbAdmin\Driver\Db\TableField;
 
 class Server extends AbstractServer
 {
@@ -146,14 +147,13 @@ class Server extends AbstractServer
 
     public function fields($table)
     {
-        $return = [];
+        $fields = [];
         $aliases = array(
             'timestamp without time zone' => 'timestamp',
             'timestamp with time zone' => 'timestamptz',
         );
 
         $identity_column = $this->minVersion(10) ? 'a.attidentity' : '0';
-
         $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type, " .
             "pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int, " .
             "col_description(c.oid, a.attnum) AS comment, $identity_column AS identity FROM pg_class c " .
@@ -163,34 +163,41 @@ class Server extends AbstractServer
             " AND n.nspname = current_schema() AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
         foreach ($this->db->rows($query) as $row)
         {
+            $field = new TableField();
+
+            $field->name = $row["field"];
+            $field->fullType = $row["full_type"];
+            $field->default = $row["default"];
+            $field->comment = $row["comment"];
             //! collation, primary
-            preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $row["full_type"], $match);
-            list(, $type, $length, $row["length"], $addon, $array) = $match;
-            $row["length"] .= $array;
+            preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $field->fullType, $match);
+            list(, $type, $length, $field->length, $addon, $array) = $match;
+            $field->length .= $array;
             $check_type = $type . $addon;
             if (isset($aliases[$check_type])) {
-                $row["type"] = $aliases[$check_type];
-                $row["full_type"] = $row["type"] . $length . $array;
+                $field->type = $aliases[$check_type];
+                $field->fullType = $field->type . $length . $array;
             } else {
-                $row["type"] = $type;
-                $row["full_type"] = $row["type"] . $length . $addon . $array;
+                $field->type = $type;
+                $field->fullType = $field->type . $length . $addon . $array;
             }
             if (in_array($row['identity'], array('a', 'd'))) {
-                $row['default'] = 'GENERATED ' . ($row['identity'] == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
+                $field->default = 'GENERATED ' . ($row['identity'] == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
             }
-            $row["null"] = !$row["attnotnull"];
-            $row["auto_increment"] = $row['identity'] || preg_match('~^nextval\(~i', $row["default"]);
-            $row["privileges"] = array("insert" => 1, "select" => 1, "update" => 1);
+            $field->null = !$row["attnotnull"];
+            $field->autoIncrement = $row['identity'] || preg_match('~^nextval\(~i', $row["default"]);
+            $field->privileges = array("insert" => 1, "select" => 1, "update" => 1);
             if (preg_match('~(.+)::[^,)]+(.*)~', $row["default"], $match)) {
                 $match1 = $match[1] ?? '';
                 $match10 = $match1[0] ?? '';
                 $match2 = $match[2] ?? '';
-                $row["default"] = ($match1 == "NULL" ? null :
+                $field->default = ($match1 == "NULL" ? null :
                     (($match10 == "'" ? $this->unescapeId($match1) : $match1) . $match2));
             }
-            $return[$row["field"]] = $row;
+
+            $fields[$field->name] = $field;
         }
-        return $return;
+        return $fields;
     }
 
     public function indexes($table, $connection = null)
@@ -231,7 +238,7 @@ class Server extends AbstractServer
             "AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc " .
             "INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = " .
             $this->quote($table) .
-            " AND pn.nspname = current_chema()) AND contype = 'f'::char ORDER BY conkey, conname";
+            " AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conname";
         foreach ($this->db->rows($query) as $row) {
             if (preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
                 $match1 = $match[1] ?? '';
@@ -529,7 +536,7 @@ class Server extends AbstractServer
     {
         $return = [];
         foreach ($row["fields"] as $field) {
-            $return[] = $field["type"];
+            $return[] = $field->type;
         }
         return $this->escapeId($name) . "(" . implode(", ", $return) . ")";
     }
@@ -633,12 +640,12 @@ class Server extends AbstractServer
 
         // fields' definitions
         foreach ($fields as $field_name => $field) {
-            $part = $this->escapeId($field['field']) . ' ' . $field['full_type'] .
-                $this->db->defaultValue($field) . ($field['attnotnull'] ? " NOT NULL" : "");
+            $part = $this->escapeId($field->name) . ' ' . $field->fullType .
+                $this->db->defaultValue($field) . ($field->attnotnull ? " NOT NULL" : "");
             $return_parts[] = $part;
 
             // sequences for fields
-            if (preg_match('~nextval\(\'([^\']+)\'\)~', $field['default'], $matches)) {
+            if (preg_match('~nextval\(\'([^\']+)\'\)~', $field->default, $matches)) {
                 $sequence_name = $matches[1];
                 $sq = reset($this->db->rows($this->minVersion(10) ?
                     "SELECT *, cache_size AS cache_value FROM pg_sequences " .
@@ -699,10 +706,10 @@ class Server extends AbstractServer
         }
 
         foreach ($fields as $field_name => $field) {
-            if ($field['comment']) {
+            if ($field->comment) {
                 $return .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status['nspname']) . "." .
                     $this->escapeId($status['Name']) . "." . $this->escapeId($field_name) .
-                    " IS " . $this->quote($field['comment']) . ";";
+                    " IS " . $this->quote($field->comment) . ";";
             }
         }
 

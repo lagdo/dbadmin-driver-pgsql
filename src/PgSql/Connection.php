@@ -90,7 +90,7 @@ class Connection extends AbstractConnection
      */
     public function value($val, $field)
     {
-        $type = $field["type"] ?? '';
+        $type = $field->type;
         return ($type == "bytea" && $val !== null ? pg_unescape_bytea($val) : $val);
     }
 
