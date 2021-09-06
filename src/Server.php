@@ -331,7 +331,7 @@ class Server extends AbstractServer
     }
 
     public function alterTable($table, $name, $fields, $foreign, $comment, $engine,
-        $collation, $auto_increment, $partitioning)
+        $collation, $autoIncrement, $partitioning)
     {
         $alter = [];
         $queries = [];
@@ -378,8 +378,8 @@ class Server extends AbstractServer
         if ($table != "" || $comment != "") {
             $queries[] = "COMMENT ON TABLE " . $this->table($name) . " IS " . $this->quote($comment);
         }
-        if ($auto_increment != "") {
-            //! $queries[] = "SELECT setval(pg_get_serial_sequence(" . $this->quote($name) . ", ), $auto_increment)";
+        if ($autoIncrement != "") {
+            //! $queries[] = "SELECT setval(pg_get_serial_sequence(" . $this->quote($name) . ", ), $autoIncrement)";
         }
         foreach ($queries as $query) {
             if (!$this->db->queries($query)) {
@@ -608,7 +608,7 @@ class Server extends AbstractServer
         return ($return ? "$return\n" : $return);
     }
 
-    public function createTableSql($table, $auto_increment, $style)
+    public function createTableSql($table, $autoIncrement, $style)
     {
         $return = '';
         $return_parts = [];
@@ -646,7 +646,7 @@ class Server extends AbstractServer
                     $this->quote($sequence_name) : "SELECT * FROM $sequence_name"));
                 $sequences[] = ($style == "DROP+CREATE" ? "DROP SEQUENCE IF EXISTS $sequence_name;\n" : "") .
                     "CREATE SEQUENCE $sequence_name INCREMENT $sq[increment_by] MINVALUE $sq[min_value] MAXVALUE $sq[max_value]" .
-                    ($auto_increment && $sq['last_value'] ? " START $sq[last_value]" : "") . " CACHE $sq[cache_value];";
+                    ($autoIncrement && $sq['last_value'] ? " START $sq[last_value]" : "") . " CACHE $sq[cache_value];";
             }
         }
 
