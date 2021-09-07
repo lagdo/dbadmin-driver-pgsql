@@ -770,10 +770,10 @@ class Server extends AbstractServer
         return $this->connection->result("SHOW max_connections");
     }
 
-    public function driverConfig()
+    protected function setConfig()
     {
-        $types = [];
-        $structuredTypes = [];
+        $this->config->jush = 'pgsql';
+        $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
         foreach (array( //! arrays
             $this->util->lang('Numbers') => array("smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20),
             $this->util->lang('Date and time') => array("date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0),
@@ -782,28 +782,20 @@ class Server extends AbstractServer
             $this->util->lang('Network') => array("cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0),
             $this->util->lang('Geometry') => array("box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0),
         ) as $key => $val) { //! can be retrieved from pg_type
-            $types += $val;
-            $structuredTypes[$key] = array_keys($val);
+            $this->config->types += $val;
+            $this->config->structuredTypes[$key] = array_keys($val);
         }
-        return array(
-            'possibleDrivers' => array("PgSQL", "PDO_PgSQL"),
-            'jush' => "pgsql",
-            'types' => $types,
-            'structuredTypes' => $structuredTypes,
-            'unsigned' => [],
-            'operators' => array("=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE", "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT IN", "IS NOT NULL"), // no "SQL" to avoid CSRF
-            'functions' => array("char_length", "lower", "round", "to_hex", "to_timestamp", "upper"),
-            'grouping' => array("avg", "count", "count distinct", "max", "min", "sum"),
-            'editFunctions' => array(
-                array(
-                    "char" => "md5",
-                    "date|time" => "now",
-                ), array(
-                    $this->db->numberRegex() => "+/-",
-                    "date|time" => "+ interval/- interval", //! escape
-                    "char|text" => "||",
-                )
-            ),
-        );
+        // $this->config->unsigned = [];
+        $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE", "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT IN", "IS NOT NULL"]; // no "SQL" to avoid CSRF
+        $this->config->functions = ["char_length", "lower", "round", "to_hex", "to_timestamp", "upper"];
+        $this->config->grouping = ["avg", "count", "count distinct", "max", "min", "sum"];
+        $this->config->editFunctions = [[
+            "char" => "md5",
+            "date|time" => "now",
+        ],[
+            $this->db->numberRegex() => "+/-",
+            "date|time" => "+ interval/- interval", //! escape
+            "char|text" => "||",
+        ]];
     }
 }
