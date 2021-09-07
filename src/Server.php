@@ -20,11 +20,6 @@ class Server extends AbstractServer
      */
     public function connect()
     {
-        // if (($this->connection)) {
-        //     // Do not create if it already exists
-        //     return;
-        // }
-
         $connection = null;
         if (extension_loaded("pgsql")) {
             $connection = new PgSql\Connection($this->db, $this->util, $this, 'PgSQL');
@@ -41,8 +36,7 @@ class Server extends AbstractServer
             $this->driver = new Driver($this->db, $this->util, $this, $connection);
         }
 
-        list($server, $options) = $this->db->options();
-        if (!$connection->open($server, $options)) {
+        if (!$connection->open($this->db->options('server'), $this->db->options())) {
             throw new AuthException($this->util->error());
         }
 
