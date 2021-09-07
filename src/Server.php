@@ -256,8 +256,8 @@ class Server extends AbstractServer
                     $row['table'] = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match14));
                 }
                 $row['target'] = array_map('trim', explode(',', $match3));
-                $row['on_delete'] = (preg_match("~ON DELETE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION');
-                $row['on_update'] = (preg_match("~ON UPDATE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION');
+                $row['onDelete'] = (preg_match("~ON DELETE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION');
+                $row['onUpdate'] = (preg_match("~ON UPDATE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION');
                 $return[$row['conname']] = $row;
             }
         }
@@ -354,7 +354,7 @@ class Server extends AbstractServer
                 $val5 = $val[5];
                 unset($val[5]);
                 if ($field[0] == "") {
-                    if (isset($val[6])) { // auto_increment
+                    if (isset($val[6])) { // auto increment
                         $val[1] = ($val[1] == " bigint" ? " big" : ($val[1] == " smallint" ? " small" : " ")) . "serial";
                     }
                     $alter[] = ($table != "" ? "ADD " : "  ") . implode($val);
