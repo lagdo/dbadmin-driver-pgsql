@@ -3,7 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
-use Lagdo\DbAdmin\Driver\Db\TableField;
+use Lagdo\DbAdmin\Driver\Entity\TableField;
 
 class Server extends AbstractServer
 {
