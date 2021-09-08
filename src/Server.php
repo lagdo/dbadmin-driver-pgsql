@@ -7,6 +7,8 @@ use Lagdo\DbAdmin\Driver\Entity\TableField;
 use Lagdo\DbAdmin\Driver\Entity\Table;
 use Lagdo\DbAdmin\Driver\Entity\Index;
 use Lagdo\DbAdmin\Driver\Entity\ForeignKey;
+use Lagdo\DbAdmin\Driver\Entity\Trigger;
+use Lagdo\DbAdmin\Driver\Entity\Routine;
 
 class Server extends AbstractServer
 {
@@ -508,13 +510,13 @@ class Server extends AbstractServer
 
     public function triggers($table)
     {
-        $return = [];
+        $triggers = [];
         $query = "SELECT * FROM information_schema.triggers WHERE trigger_schema = current_schema() " .
             "AND event_object_table = " . $this->quote($table);
         foreach ($this->db->rows($query) as $row) {
-            $return[$row["trigger_name"]] = [$row["action_timing"], $row["event_manipulation"]];
+            $triggers[$row["trigger_name"]] = new Trigger($row["action_timing"], $row["event_manipulation"]);
         }
-        return $return;
+        return $triggers;
     }
 
     public function triggerOptions()
@@ -546,7 +548,10 @@ class Server extends AbstractServer
         $query = 'SELECT specific_name AS "SPECIFIC_NAME", routine_type AS "ROUTINE_TYPE", ' .
             'routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER" ' .
             'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
-        return $this->db->rows($query);
+        $rows = $this->db->rows($query);
+        return array_map(function($row) {
+            return new Routine($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'], $row['ROUTINE_TYPE'], $row['DTD_IDENTIFIER']);
+        }, $rows);
     }
 
     public function routineLanguages()
@@ -806,24 +811,17 @@ class Server extends AbstractServer
         $this->config->jush = 'pgsql';
         $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
 
-        $groups = [ //! arrays
-            $this->util->lang('Numbers'),
-            $this->util->lang('Date and time'),
-            $this->util->lang('Strings'),
-            $this->util->lang('Binary'),
-            $this->util->lang('Network'),
-            $this->util->lang('Geometry'),
+        $types = [ //! arrays
+            $this->util->lang('Numbers') => ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
+            $this->util->lang('Date and time') => ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
+            $this->util->lang('Strings') => ["character" => 0, "character varying" => 0, "text" => 0, "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
+            $this->util->lang('Binary') => ["bit" => 0, "bit varying" => 0, "bytea" => 0],
+            $this->util->lang('Network') => ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
+            $this->util->lang('Geometry') => ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0],
         ];
-        $this->config->types = [ //! arrays
-            ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
-            ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
-            ["character" => 0, "character varying" => 0, "text" => 0, "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
-            ["bit" => 0, "bit varying" => 0, "bytea" => 0],
-            ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
-            ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0],
-        ];
-        foreach ($groups as $key => $group) {
-            $this->config->structuredTypes[$group] = array_keys($this->config->types[$key]);
+        foreach ($types as $group => $_types) {
+            $this->config->structuredTypes[$group] = array_keys($_types);
+            $this->config->types = array_merge($this->config->types, $_types);
         }
 
         // $this->config->unsigned = [];
