@@ -6,6 +6,7 @@ use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 use Lagdo\DbAdmin\Driver\Entity\TableField;
 use Lagdo\DbAdmin\Driver\Entity\Table;
 use Lagdo\DbAdmin\Driver\Entity\Index;
+use Lagdo\DbAdmin\Driver\Entity\ForeignKey;
 
 class Server extends AbstractServer
 {
@@ -248,7 +249,7 @@ class Server extends AbstractServer
 
     public function foreignKeys($table)
     {
-        $return = [];
+        $foreignKeys = [];
         $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid) " .
             "AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc " .
             "INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = " .
@@ -261,22 +262,28 @@ class Server extends AbstractServer
                 $match3 = $match[3] ?? '';
                 $match4 = $match[4] ?? '';
                 $match11 = '';
-                $row['source'] = array_map('trim', explode(',', $match1));
+
+                $foreignKey = new ForeignKey();
+
+                $foreignKey->db = $row['db'];
+                $foreignKey->source = array_map('trim', explode(',', $match1));
+                $foreignKey->target = array_map('trim', explode(',', $match3));
+                $foreignKey->onDelete = preg_match("~ON DELETE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION';
+                $foreignKey->onUpdate = preg_match("~ON UPDATE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION';
+
                 if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match2, $match10)) {
                     $match11 = $match10[1] ?? '';
                     $match12 = $match10[2] ?? '';
                     // $match13 = $match10[3] ?? '';
                     $match14 = $match10[4] ?? '';
-                    $row['ns'] = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match12));
-                    $row['table'] = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match14));
+                    $foreignKey->schema = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match12));
+                    $foreignKey->table = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match14));
                 }
-                $row['target'] = array_map('trim', explode(',', $match3));
-                $row['onDelete'] = (preg_match("~ON DELETE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION');
-                $row['onUpdate'] = (preg_match("~ON UPDATE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION');
-                $return[$row['conname']] = $row;
+
+                $foreignKeys[$row['conname']] = $foreignKey;
             }
         }
-        return $return;
+        return $foreignKeys;
     }
 
     public function constraints($table)
@@ -624,7 +631,7 @@ class Server extends AbstractServer
         foreach ($fkeys as $fkey_name => $fkey) {
             $return .= "ALTER TABLE ONLY " . $this->escapeId($status->schema) . "." .
                 $this->escapeId($status->name) . " ADD CONSTRAINT " . $this->escapeId($fkey_name) .
-                " $fkey[definition] " . ($fkey['deferrable'] ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
+                " {$fkey->definition} " . ($fkey->deferrable ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
         }
 
         return ($return ? "$return\n" : $return);
