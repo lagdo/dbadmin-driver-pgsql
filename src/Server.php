@@ -68,18 +68,39 @@ class Server extends AbstractServer
         return '"' . str_replace('"', '""', $idf) . '"';
     }
 
+    /**
+     * @inheritDoc
+     */
     public function databases($flush)
     {
         return $this->db->values("SELECT datname FROM pg_database WHERE " .
             "has_database_privilege(datname, 'CONNECT') ORDER BY datname");
     }
 
+    /**
+     * @inheritDoc
+     */
+    public function databaseSize($database)
+    {
+        $statement = $this->connection->query("SELECT pg_database_size(" . $this->quote($database) . ")");
+        if (is_object($statement) && ($row = $statement->fetchRow())) {
+            return intval($row[0]);
+        }
+        return 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function limit($query, $where, $limit, $offset = 0, $separator = " ")
     {
         return " $query$where" . ($limit !== null ? $separator . "LIMIT $limit" .
             ($offset ? " OFFSET $offset" : "") : "");
     }
 
+    /**
+     * @inheritDoc
+     */
     public function limitToOne($table, $query, $where, $separator = "\n")
     {
         return (preg_match('~^INTO~', $query) ? $this->limit($query, $where, 1, 0, $separator) :
@@ -88,6 +109,9 @@ class Server extends AbstractServer
         );
     }
 
+    /**
+     * @inheritDoc
+     */
     public function databaseCollation($db, $collations)
     {
         return $this->connection->result("SELECT datcollate FROM pg_database WHERE datname = " . $this->quote($db));
@@ -267,7 +291,6 @@ class Server extends AbstractServer
 
                 $foreignKey = new ForeignKey();
 
-                $foreignKey->db = $row['db'];
                 $foreignKey->source = array_map('trim', explode(',', $match1));
                 $foreignKey->target = array_map('trim', explode(',', $match3));
                 $foreignKey->onDelete = preg_match("~ON DELETE ({$this->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION';
