@@ -4,6 +4,7 @@ namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 use Lagdo\DbAdmin\Driver\Entity\TableField;
+use Lagdo\DbAdmin\Driver\Entity\Table;
 
 class Server extends AbstractServer
 {
@@ -108,30 +109,45 @@ class Server extends AbstractServer
         return []; // would require reconnect
     }
 
+    /**
+     * @inheritDoc
+     */
     public function tableStatus($name = "", $fast = false)
     {
-        $return = [];
+        $tables = [];
         $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
             "WHEN 'r' THEN 'table' WHEN 'm' THEN 'materialized view' ELSE 'view' END AS \"Engine\", " .
             "pg_relation_size(c.oid) AS \"Data_length\", " .
             "pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\", " .
             "obj_description(c.oid, 'pg_class') AS \"Comment\", " .
             ($this->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
-            " AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c JOIN pg_namespace n " .
-            "ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
+            " AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c " .
+            "JOIN pg_namespace n ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
             "WHERE relkind IN ('r', 'm', 'v', 'f', 'p') " .
             ($name != "" ? "AND relname = " . $this->quote($name) : "ORDER BY relname");
         foreach ($this->db->rows($query) as $row)
         {
+            $status = new Table($row['Name']);
+            $status->engine = $row['Engine'];
+            $status->schema = $row['nspname'];
+            $status->dataLength = $row['Data_length'];
+            $status->indexLength = $row['Index_length'];
+            $status->oid = $row['Oid'];
+            $status->rows = $row['Rows'];
+            $status->comment = $row['Comment'];
+
             //! Index_length, Auto_increment
-            $return[$row["Name"]] = $row;
+            if ($name != "") {
+                return $status;
+            }
+            $tables[$row["Name"]] = $status;
         }
-        return ($name != "" ? $return[$name] : $return);
+        return $tables;
     }
 
     public function isView($tableStatus)
     {
-        return in_array($tableStatus["Engine"], ["view", "materialized view"]);
+        return in_array($tableStatus->engine, ["view", "materialized view"]);
     }
 
     public function supportForeignKeys($tableStatus)
@@ -441,7 +457,7 @@ class Server extends AbstractServer
     {
         foreach ($tables as $table) {
             $status = $this->tableStatus($table);
-            if (!$this->db->queries("DROP " . strtoupper($status["Engine"]) . " " . $this->table($table))) {
+            if (!$this->db->queries("DROP " . strtoupper($status->engine) . " " . $this->table($table))) {
                 return false;
             }
         }
@@ -452,7 +468,7 @@ class Server extends AbstractServer
     {
         foreach (array_merge($tables, $views) as $table) {
             $status = $this->tableStatus($table);
-            if (!$this->db->queries("ALTER " . strtoupper($status["Engine"]) . " " .
+            if (!$this->db->queries("ALTER " . strtoupper($status->engine) . " " .
                 $this->table($table) . " SET SCHEMA " . $this->escapeId($target))) {
                 return false;
             }
@@ -547,7 +563,7 @@ class Server extends AbstractServer
 
     public function countRows($tableStatus, $where)
     {
-        $query = "EXPLAIN SELECT * FROM " . $this->escapeId($tableStatus["Name"]) .
+        $query = "EXPLAIN SELECT * FROM " . $this->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");
         if (preg_match("~ rows=([0-9]+)~", $this->connection->result($query), $regs ))
         {
@@ -601,8 +617,8 @@ class Server extends AbstractServer
         ksort($fkeys);
 
         foreach ($fkeys as $fkey_name => $fkey) {
-            $return .= "ALTER TABLE ONLY " . $this->escapeId($status['nspname']) . "." .
-                $this->escapeId($status['Name']) . " ADD CONSTRAINT " . $this->escapeId($fkey_name) .
+            $return .= "ALTER TABLE ONLY " . $this->escapeId($status->schema) . "." .
+                $this->escapeId($status->name) . " ADD CONSTRAINT " . $this->escapeId($fkey_name) .
                 " $fkey[definition] " . ($fkey['deferrable'] ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
         }
 
@@ -629,8 +645,8 @@ class Server extends AbstractServer
             return false;
         }
 
-        $return = "CREATE TABLE " . $this->escapeId($status['nspname']) . "." .
-            $this->escapeId($status['Name']) . " (\n    ";
+        $return = "CREATE TABLE " . $this->escapeId($status->schema) . "." .
+            $this->escapeId($status->name) . " (\n    ";
 
         // fields' definitions
         foreach ($fields as $field_name => $field) {
@@ -678,7 +694,7 @@ class Server extends AbstractServer
             $return_parts[] = "CONSTRAINT " . $this->escapeId($conname) . " CHECK $consrc";
         }
 
-        $return .= implode(",\n    ", $return_parts) . "\n) WITH (oids = " . ($status['Oid'] ? 'true' : 'false') . ");";
+        $return .= implode(",\n    ", $return_parts) . "\n) WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
 
         // "basic" indexes after table definition
         foreach ($indexes as $index_name => $index) {
@@ -688,21 +704,21 @@ class Server extends AbstractServer
                     $columns[] = $this->escapeId($val) . ($index['descs'][$key] ? " DESC" : "");
                 }
                 $return .= "\n\nCREATE INDEX " . $this->escapeId($index_name) . " ON " .
-                    $this->escapeId($status['nspname']) . "." . $this->escapeId($status['Name']) .
+                    $this->escapeId($status->schema) . "." . $this->escapeId($status->name) .
                     " USING btree (" . implode(', ', $columns) . ");";
             }
         }
 
         // coments for table & fields
-        if ($status['Comment']) {
-            $return .= "\n\nCOMMENT ON TABLE " . $this->escapeId($status['nspname']) . "." .
-                $this->escapeId($status['Name']) . " IS " . $this->quote($status['Comment']) . ";";
+        if ($status->comment) {
+            $return .= "\n\nCOMMENT ON TABLE " . $this->escapeId($status->schema) . "." .
+                $this->escapeId($status->name) . " IS " . $this->quote($status->comment) . ";";
         }
 
         foreach ($fields as $field_name => $field) {
             if ($field->comment) {
-                $return .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status['nspname']) . "." .
-                    $this->escapeId($status['Name']) . "." . $this->escapeId($field_name) .
+                $return .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status->schema) . "." .
+                    $this->escapeId($status->name) . "." . $this->escapeId($field_name) .
                     " IS " . $this->quote($field->comment) . ";";
             }
         }
@@ -720,10 +736,10 @@ class Server extends AbstractServer
         $status = $this->tableStatus($table);
         $return = "";
         foreach ($this->triggers($table) as $trg_id => $trg) {
-            $trigger = $this->trigger($trg_id, $status['Name']);
+            $trigger = $this->trigger($trg_id, $status->name);
             $return .= "\nCREATE TRIGGER " . $this->escapeId($trigger['Trigger']) .
-                " $trigger[Timing] $trigger[Events] ON " . $this->escapeId($status["nspname"]) . "." .
-                $this->escapeId($status['Name']) . " $trigger[Type] $trigger[Statement];;\n";
+                " $trigger[Timing] $trigger[Events] ON " . $this->escapeId($status->schema) . "." .
+                $this->escapeId($status->name) . " $trigger[Type] $trigger[Statement];;\n";
         }
         return $return;
     }
