@@ -48,11 +48,11 @@ class Server extends AbstractServer
         if ($this->minVersion(9, 0)) {
             $connection->query("SET application_name = 'Adminer'");
             if ($this->minVersion(9.2, 0)) {
-                $this->structuredTypes[$this->util->lang('Strings')][] = "json";
-                $this->types["json"] = 4294967295;
+                $this->config->structuredTypes[$this->util->lang('Strings')][] = "json";
+                $this->config->types["json"] = 4294967295;
                 if ($this->minVersion(9.4, 0)) {
-                    $this->structuredTypes[$this->util->lang('Strings')][] = "jsonb";
-                    $this->types["jsonb"] = 4294967295;
+                    $this->config->structuredTypes[$this->util->lang('Strings')][] = "jsonb";
+                    $this->config->types["jsonb"] = 4294967295;
                 }
             }
         }
@@ -207,7 +207,7 @@ class Server extends AbstractServer
             $field->fullType = $row["full_type"];
             $field->default = $row["default"];
             $field->comment = $row["comment"];
-            //! collation, primary
+            //! No collation, no info about primary keys
             preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $field->fullType, $match);
             list(, $type, $length, $field->length, $addon, $array) = $match;
             $field->length .= $array;
@@ -637,9 +637,9 @@ class Server extends AbstractServer
         }
         $return = $connection->query("SET search_path TO " . $this->escapeId($schema));
         foreach ($this->userTypes() as $type) { //! get types from current_schemas('t')
-            if (!isset($this->types[$type])) {
-                $this->types[$type] = 0;
-                $this->structuredTypes[$this->util->lang('User types')][] = $type;
+            if (!isset($this->config->types[$type])) {
+                $this->config->types[$type] = 0;
+                $this->config->structuredTypes[$this->util->lang('User types')][] = $type;
             }
         }
         return $return;
