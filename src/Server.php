@@ -5,6 +5,7 @@ namespace Lagdo\DbAdmin\Driver\PgSql;
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 use Lagdo\DbAdmin\Driver\Entity\TableField;
 use Lagdo\DbAdmin\Driver\Entity\Table;
+use Lagdo\DbAdmin\Driver\Entity\Index;
 
 class Server extends AbstractServer
 {
@@ -215,7 +216,7 @@ class Server extends AbstractServer
         if (!is_object($connection)) {
             $connection = $this->connection;
         }
-        $return = [];
+        $indexes = [];
         $table_oid = $connection->result("SELECT oid FROM pg_class WHERE " .
             "relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()) " .
             "AND relname = " . $this->quote($table));
@@ -225,20 +226,24 @@ class Server extends AbstractServer
             "indoption, (indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
             "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid", $connection) as $row)
         {
+            $index = new Index();
+
             $relname = $row["relname"];
-            $return[$relname]["type"] = ($row["indispartial"] ? "INDEX" :
+            $index->type = ($row["indispartial"] ? "INDEX" :
                 ($row["indisprimary"] ? "PRIMARY" : ($row["indisunique"] ? "UNIQUE" : "INDEX")));
-            $return[$relname]["columns"] = [];
+            $index->columns = [];
             foreach (explode(" ", $row["indkey"]) as $indkey) {
-                $return[$relname]["columns"][] = $columns[$indkey];
+                $index->columns[] = $columns[$indkey];
             }
-            $return[$relname]["descs"] = [];
+            $index->descs = [];
             foreach (explode(" ", $row["indoption"]) as $indoption) {
-                $return[$relname]["descs"][] = ($indoption & 1 ? '1' : null); // 1 - INDOPTION_DESC
+                $index->descs[] = ($indoption & 1 ? '1' : null); // 1 - INDOPTION_DESC
             }
-            $return[$relname]["lengths"] = [];
+            $index->lengths = [];
+
+            $indexes[$relname] = $index;
         }
-        return $return;
+        return $indexes;
     }
 
     public function foreignKeys($table)
@@ -674,18 +679,18 @@ class Server extends AbstractServer
 
         // primary + unique keys
         foreach ($indexes as $index_name => $index) {
-            switch ($index['type']) {
+            switch ($index->type) {
                 case 'UNIQUE':
                     $return_parts[] = "CONSTRAINT " . $this->escapeId($index_name) .
                         " UNIQUE (" . implode(', ', array_map(function ($column) {
                             return $this->escapeId($column);
-                        }, $index['columns'])) . ")";
+                        }, $index->columns)) . ")";
                     break;
                 case 'PRIMARY':
                     $return_parts[] = "CONSTRAINT " . $this->escapeId($index_name) .
                         " PRIMARY KEY (" . implode(', ', array_map(function ($column) {
                             return $this->escapeId($column);
-                        }, $index['columns'])) . ")";
+                        }, $index->columns)) . ")";
                     break;
             }
         }
@@ -698,10 +703,10 @@ class Server extends AbstractServer
 
         // "basic" indexes after table definition
         foreach ($indexes as $index_name => $index) {
-            if ($index['type'] == 'INDEX') {
+            if ($index->type == 'INDEX') {
                 $columns = [];
-                foreach ($index['columns'] as $key => $val) {
-                    $columns[] = $this->escapeId($val) . ($index['descs'][$key] ? " DESC" : "");
+                foreach ($index->columns as $key => $val) {
+                    $columns[] = $this->escapeId($val) . ($index->descs[$key] ? " DESC" : "");
                 }
                 $return .= "\n\nCREATE INDEX " . $this->escapeId($index_name) . " ON " .
                     $this->escapeId($status->schema) . "." . $this->escapeId($status->name) .
