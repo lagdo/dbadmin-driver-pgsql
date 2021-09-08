@@ -131,7 +131,7 @@ class Server extends AbstractServer
 
     public function isView($tableStatus)
     {
-        return in_array($tableStatus["Engine"], array("view", "materialized view"));
+        return in_array($tableStatus["Engine"], ["view", "materialized view"]);
     }
 
     public function supportForeignKeys($tableStatus)
@@ -142,10 +142,10 @@ class Server extends AbstractServer
     public function fields($table)
     {
         $fields = [];
-        $aliases = array(
+        $aliases = [
             'timestamp without time zone' => 'timestamp',
             'timestamp with time zone' => 'timestamptz',
-        );
+        ];
 
         $identity_column = $this->minVersion(10) ? 'a.attidentity' : '0';
         $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type, " .
@@ -175,12 +175,12 @@ class Server extends AbstractServer
                 $field->type = $type;
                 $field->fullType = $field->type . $length . $addon . $array;
             }
-            if (in_array($row['identity'], array('a', 'd'))) {
+            if (in_array($row['identity'], ['a', 'd'])) {
                 $field->default = 'GENERATED ' . ($row['identity'] == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
             }
             $field->null = !$row["attnotnull"];
             $field->autoIncrement = $row['identity'] || preg_match('~^nextval\(~i', $row["default"]);
-            $field->privileges = array("insert" => 1, "select" => 1, "update" => 1);
+            $field->privileges = ["insert" => 1, "select" => 1, "update" => 1];
             if (preg_match('~(.+)::[^,)]+(.*)~', $row["default"], $match)) {
                 $match1 = $match[1] ?? '';
                 $match10 = $match1[0] ?? '';
@@ -463,7 +463,7 @@ class Server extends AbstractServer
     public function trigger($name, $table = null)
     {
         if ($name == "") {
-            return array("Statement" => "EXECUTE PROCEDURE ()");
+            return ["Statement" => "EXECUTE PROCEDURE ()"];
         }
         if ($table === null) {
             $table = $this->util->input()->getTable();
@@ -484,18 +484,18 @@ class Server extends AbstractServer
         $query = "SELECT * FROM information_schema.triggers WHERE trigger_schema = current_schema() " .
             "AND event_object_table = " . $this->quote($table);
         foreach ($this->db->rows($query) as $row) {
-            $return[$row["trigger_name"]] = array($row["action_timing"], $row["event_manipulation"]);
+            $return[$row["trigger_name"]] = [$row["action_timing"], $row["event_manipulation"]];
         }
         return $return;
     }
 
     public function triggerOptions()
     {
-        return array(
-            "Timing" => array("BEFORE", "AFTER"),
-            "Event" => array("INSERT", "UPDATE", "DELETE"),
-            "Type" => array("FOR EACH ROW", "FOR EACH STATEMENT"),
-        );
+        return [
+            "Timing" => ["BEFORE", "AFTER"],
+            "Event" => ["INSERT", "UPDATE", "DELETE"],
+            "Type" => ["FOR EACH ROW", "FOR EACH STATEMENT"],
+        ];
     }
 
     public function routine($name, $type)
@@ -505,7 +505,7 @@ class Server extends AbstractServer
             'AND specific_name = ' . $this->quote($name);
         $rows = $this->db->rows($query);
         $return = $rows[0];
-        $return["returns"] = array("type" => $return["type_udt_name"]);
+        $return["returns"] = ["type" => $return["type_udt_name"]];
         $query = 'SELECT parameter_name AS field, data_type AS type, character_maximum_length AS length, ' .
             'parameter_mode AS inout FROM information_schema.parameters WHERE specific_schema = current_schema() ' .
             'AND specific_name = ' . $this->quote($name) . ' ORDER BY ordinal_position';
@@ -770,21 +770,34 @@ class Server extends AbstractServer
         return $this->connection->result("SHOW max_connections");
     }
 
+    /**
+     * @inheritDoc
+     */
     protected function setConfig()
     {
         $this->config->jush = 'pgsql';
         $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
-        foreach (array( //! arrays
-            $this->util->lang('Numbers') => array("smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20),
-            $this->util->lang('Date and time') => array("date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0),
-            $this->util->lang('Strings') => array("character" => 0, "character varying" => 0, "text" => 0, "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0),
-            $this->util->lang('Binary') => array("bit" => 0, "bit varying" => 0, "bytea" => 0),
-            $this->util->lang('Network') => array("cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0),
-            $this->util->lang('Geometry') => array("box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0),
-        ) as $key => $val) { //! can be retrieved from pg_type
-            $this->config->types += $val;
-            $this->config->structuredTypes[$key] = array_keys($val);
+
+        $groups = [ //! arrays
+            $this->util->lang('Numbers'),
+            $this->util->lang('Date and time'),
+            $this->util->lang('Strings'),
+            $this->util->lang('Binary'),
+            $this->util->lang('Network'),
+            $this->util->lang('Geometry'),
+        ];
+        $this->config->types = [ //! arrays
+            ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
+            ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
+            ["character" => 0, "character varying" => 0, "text" => 0, "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
+            ["bit" => 0, "bit varying" => 0, "bytea" => 0],
+            ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
+            ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0],
+        ];
+        foreach ($groups as $key => $group) {
+            $this->config->structuredTypes[$group] = array_keys($this->config->types[$key]);
         }
+
         // $this->config->unsigned = [];
         $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE", "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT IN", "IS NOT NULL"]; // no "SQL" to avoid CSRF
         $this->config->functions = ["char_length", "lower", "round", "to_hex", "to_timestamp", "upper"];
