@@ -3,7 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\PgSql;
 
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\Entity\StatementField;
+use Lagdo\DbAdmin\Driver\Entity\StatementFieldEntity;
 
 use stdClass;
 
@@ -67,7 +67,7 @@ class Statement implements StatementInterface
         $table = pg_field_table($this->result, $column);
         $name = pg_field_name($this->result, $column);
         $type = pg_field_type($this->result, $column);
-        return new StatementField($type, $type === "bytea", $name, $name, $table, $table);
+        return new StatementFieldEntity($type, $type === "bytea", $name, $name, $table, $table);
     }
 
     /**

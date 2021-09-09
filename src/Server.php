@@ -3,12 +3,12 @@
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
-use Lagdo\DbAdmin\Driver\Entity\TableField;
-use Lagdo\DbAdmin\Driver\Entity\Table;
-use Lagdo\DbAdmin\Driver\Entity\Index;
-use Lagdo\DbAdmin\Driver\Entity\ForeignKey;
-use Lagdo\DbAdmin\Driver\Entity\Trigger;
-use Lagdo\DbAdmin\Driver\Entity\Routine;
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
+use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
+use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
+use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
 
 class Server extends AbstractServer
 {
@@ -155,7 +155,7 @@ class Server extends AbstractServer
             ($name != "" ? "AND relname = " . $this->quote($name) : "ORDER BY relname");
         foreach ($this->db->rows($query) as $row)
         {
-            $status = new Table($row['Name']);
+            $status = new TableEntity($row['Name']);
             $status->engine = $row['Engine'];
             $status->schema = $row['nspname'];
             $status->dataLength = $row['Data_length'];
@@ -201,7 +201,7 @@ class Server extends AbstractServer
             " AND n.nspname = current_schema() AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
         foreach ($this->db->rows($query) as $row)
         {
-            $field = new TableField();
+            $field = new TableFieldEntity();
 
             $field->name = $row["field"];
             $field->fullType = $row["full_type"];
@@ -253,7 +253,7 @@ class Server extends AbstractServer
             "indoption, (indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
             "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid", $connection) as $row)
         {
-            $index = new Index();
+            $index = new IndexEntity();
 
             $relname = $row["relname"];
             $index->type = ($row["indispartial"] ? "INDEX" :
@@ -289,7 +289,7 @@ class Server extends AbstractServer
                 $match4 = $match[4] ?? '';
                 $match11 = '';
 
-                $foreignKey = new ForeignKey();
+                $foreignKey = new ForeignKeyEntity();
 
                 $foreignKey->source = array_map('trim', explode(',', $match1));
                 $foreignKey->target = array_map('trim', explode(',', $match3));
@@ -573,7 +573,7 @@ class Server extends AbstractServer
             'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
         $rows = $this->db->rows($query);
         return array_map(function($row) {
-            return new Routine($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'], $row['ROUTINE_TYPE'], $row['DTD_IDENTIFIER']);
+            return new RoutineEntity($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'], $row['ROUTINE_TYPE'], $row['DTD_IDENTIFIER']);
         }, $rows);
     }
 
