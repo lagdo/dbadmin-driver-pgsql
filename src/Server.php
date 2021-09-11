@@ -68,6 +68,54 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
+    public function truncateTables(array $tables)
+    {
+        return $this->driver->queries("TRUNCATE " . implode(", ", array_map(function ($table) {
+            return $this->driver->table($table);
+        }, $tables)));
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function dropViews(array $views)
+    {
+        return $this->dropTables($views);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function dropTables(array $tables)
+    {
+        foreach ($tables as $table) {
+            $status = $this->tableStatus($table);
+            if (!$this->driver->queries("DROP " . strtoupper($status->engine) . " " . $this->driver->table($table))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function moveTables(array $tables, array $views, string $target)
+    {
+        foreach (array_merge($tables, $views) as $table) {
+            $status = $this->tableStatus($table);
+            if (!$this->driver->queries("ALTER " . strtoupper($status->engine) . " " .
+                $this->driver->table($table) . " SET SCHEMA " . $this->driver->escapeId($target))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function collations()
     {
         //! supported in CREATE DATABASE
