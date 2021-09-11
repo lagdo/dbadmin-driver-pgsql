@@ -1,6 +1,6 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Pdo;
+namespace Lagdo\DbAdmin\Driver\PgSql\Db\Pdo;
 
 use Lagdo\DbAdmin\Driver\Db\Pdo\Connection as PdoConnection;
 

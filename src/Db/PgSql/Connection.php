@@ -1,6 +1,6 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\PgSql;
+namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;

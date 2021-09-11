@@ -30,10 +30,10 @@ class Driver extends AbstractDriver
     {
         $connection = null;
         if (extension_loaded("pgsql")) {
-            $connection = new PgSql\Connection($this, $this->util, 'PgSQL');
+            $connection = new Db\PgSql\Connection($this, $this->util, 'PgSQL');
         }
         elseif (extension_loaded("pdo_pgsql")) {
-            $connection = new Pdo\Connection($this, $this->util, 'PDO_PgSQL');
+            $connection = new Db\Pdo\Connection($this, $this->util, 'PDO_PgSQL');
         }
         else {
             throw new AuthException($this->util->lang('No package installed to connect to a PostgreSQL server.'));
@@ -41,10 +41,10 @@ class Driver extends AbstractDriver
 
         if ($this->connection === null) {
             $this->connection = $connection;
-            $this->server = new Server($this, $this->util, $connection);
-            $this->table = new Table($this, $this->util, $connection);
-            $this->query = new Query($this, $this->util, $connection);
-            $this->grammar = new Grammar($this, $this->util, $connection);
+            $this->server = new Db\Server($this, $this->util, $connection);
+            $this->table = new Db\Table($this, $this->util, $connection);
+            $this->query = new Db\Query($this, $this->util, $connection);
+            $this->grammar = new Db\Grammar($this, $this->util, $connection);
         }
 
         if (!$connection->open($this->options('server'), $this->options())) {
