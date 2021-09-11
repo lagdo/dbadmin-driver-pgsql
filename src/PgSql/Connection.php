@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\PgSql;
 
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;
 
 /**
@@ -36,18 +37,18 @@ class Connection extends AbstractConnection
             $error = html_entity_decode(strip_tags($error));
         }
         $error = preg_replace('~^[^:]*: ~', '', $error);
-        $this->db->setError($error);
+        $this->driver->setError($error);
     }
 
     /**
      * @inheritDoc
      */
-    public function open($server, array $options)
+    public function open(string $server, array $options)
     {
         $username = $options['username'];
         $password = $options['password'];
 
-        $database = $this->server->selectedDatabase();
+        $database = $this->driver->selectedDatabase();
         set_error_handler(array($this, '_error'));
         $this->_string = "host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
             "' user='" . addcslashes($username, "'\\") . "' password='" . addcslashes($password, "'\\") . "'";
@@ -80,7 +81,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function quote($string)
+    public function quote(string $string)
     {
         return "'" . pg_escape_string($this->client, $string) . "'";
     }
@@ -88,7 +89,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value($val, $field)
+    public function value(?string $val, TableFieldEntity $field)
     {
         $type = $field->type;
         return ($type == "bytea" && $val !== null ? pg_unescape_bytea($val) : $val);
@@ -107,7 +108,7 @@ class Connection extends AbstractConnection
      */
     public function selectDatabase($database)
     {
-        if ($database == $this->server->selectedDatabase()) {
+        if ($database == $this->driver->selectedDatabase()) {
             return $this->_database;
         }
         $client = @pg_connect("{$this->_string} dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);
@@ -128,15 +129,15 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function query($query, $unbuffered = false)
+    public function query(string $query, bool $unbuffered = false)
     {
         $result = @pg_query($this->client, $query);
-        $this->db->setError();
+        $this->driver->setError();
         if (!$result) {
-            $this->db->setError(pg_last_error($this->client));
+            $this->driver->setError(pg_last_error($this->client));
             $return = false;
         } elseif (!pg_num_fields($result)) {
-            $this->db->setAffectedRows(pg_affected_rows($result));
+            $this->driver->setAffectedRows(pg_affected_rows($result));
             $return = true;
         } else {
             $return = new Statement($result);
@@ -176,7 +177,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function result($query, $field = 0)
+    public function result(string $query, int $field = 0)
     {
         $result = $this->query($query);
         if (!$result || !$result->numRows) {

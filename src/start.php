@@ -2,5 +2,9 @@
 
 $di = \jaxon()->di();
 // Register the database classes in the dependency container
-$di->auto(Lagdo\DbAdmin\Driver\PgSql\Server::class);
-$di->alias('adminer_server_pgsql', Lagdo\DbAdmin\Driver\PgSql\Server::class);
+$di->set(Lagdo\DbAdmin\Driver\PgSql\Driver::class, function($di) {
+    $util = $di->get(Lagdo\DbAdmin\Driver\UtilInterface::class);
+    $options = $di->get('adminer_config_options');
+    return new Lagdo\DbAdmin\Driver\PgSql\Driver($util, $options);
+});
+$di->alias('adminer_driver_pgsql', Lagdo\DbAdmin\Driver\PgSql\Driver::class);

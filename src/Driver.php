@@ -2,58 +2,130 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
-use Lagdo\DbAdmin\Driver\Db\Driver as AbstractDriver;
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
+use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
+use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
+use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
+
+use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
+
+use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
 
 class Driver extends AbstractDriver
 {
-    public function insertOrUpdate($table, $rows, $primary)
+    /**
+     * @inheritDoc
+     */
+    public function name()
     {
-        foreach ($rows as $set) {
-            $update = [];
-            $where = [];
-            foreach ($set as $key => $val) {
-                $update[] = "$key = $val";
-                if (isset($primary[$this->server->unescapeId($key)])) {
-                    $where[] = "$key = $val";
+        return "PostgreSQL";
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createConnection()
+    {
+        $connection = null;
+        if (extension_loaded("pgsql")) {
+            $connection = new PgSql\Connection($this, $this->util, 'PgSQL');
+        }
+        elseif (extension_loaded("pdo_pgsql")) {
+            $connection = new Pdo\Connection($this, $this->util, 'PDO_PgSQL');
+        }
+        else {
+            throw new AuthException($this->util->lang('No package installed to connect to a PostgreSQL server.'));
+        }
+
+        if ($this->connection === null) {
+            $this->connection = $connection;
+            $this->server = new Server($this, $this->util, $connection);
+            $this->table = new Table($this, $this->util, $connection);
+            $this->query = new Query($this, $this->util, $connection);
+            $this->grammar = new Grammar($this, $this->util, $connection);
+        }
+
+        if (!$connection->open($this->options('server'), $this->options())) {
+            throw new AuthException($this->error());
+        }
+
+        if ($this->minVersion(9, 0)) {
+            $connection->query("SET application_name = 'Adminer'");
+            if ($this->minVersion(9.2, 0)) {
+                $this->config->structuredTypes[$this->util->lang('Strings')][] = "json";
+                $this->config->types["json"] = 4294967295;
+                if ($this->minVersion(9.4, 0)) {
+                    $this->config->structuredTypes[$this->util->lang('Strings')][] = "jsonb";
+                    $this->config->types["jsonb"] = 4294967295;
                 }
             }
-            if (!(
-                ($where && $this->db->queries("UPDATE " . $this->server->table($table) .
-                " SET " . implode(", ", $update) . " WHERE " . implode(" AND ", $where)) &&
-                $this->db->affectedRows()) ||
-                $this->db->queries("INSERT INTO " . $this->server->table($table) .
-                " (" . implode(", ", array_keys($set)) . ") VALUES (" . implode(", ", $set) . ")")
-            )) {
-                return false;
+        }
+
+        return $connection;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function selectSchema(string $schema, ConnectionInterface $connection = null)
+    {
+        if (!$connection) {
+            $connection = $this->connection;
+        }
+        $return = $connection->query("SET search_path TO " . $this->escapeId($schema));
+        foreach ($this->userTypes() as $type) { //! get types from current_schemas('t')
+            if (!isset($this->config->types[$type])) {
+                $this->config->types[$type] = 0;
+                $this->config->structuredTypes[$this->util->lang('User types')][] = $type;
             }
         }
-        return true;
+        return $return;
     }
 
-    public function slowQuery($query, $timeout)
+    /**
+     * @inheritDoc
+     */
+    public function support(string $feature)
     {
-        $this->connection->query("SET statement_timeout = " . (1000 * $timeout));
-        $this->connection->timeout = 1000 * $timeout;
-        return $query;
+        return preg_match('~^(database|table|columns|sql|indexes|descidx|comment|view|' .
+            ($this->minVersion(9.3) ? 'materializedview|' : '') .
+            'scheme|routine|processlist|sequence|trigger|type|variables|drop_col|kill|dump|fkeys_sql)$~', $feature);
     }
 
-    public function convertSearch($idf, $val, $field)
+    /**
+     * @inheritDoc
+     */
+    protected function setConfig()
     {
-        return (preg_match('~char|text' . (!preg_match('~LIKE~', $val["op"]) ?
-            '|date|time(stamp)?|boolean|uuid|' . $this->db->numberRegex() : '') . '~', $field->type) ?
-            $idf : "CAST($idf AS text)"
-        );
-    }
+        $this->config->jush = 'pgsql';
+        $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
 
-    public function tableHelp($name)
-    {
-        $links = array(
-            "information_schema" => "infoschema",
-            "pg_catalog" => "catalog",
-        );
-        $link = $links[$this->server->selectedSchema()];
-        if ($link) {
-            return "$link-" . str_replace("_", "-", $name) . ".html";
+        $types = [ //! arrays
+            $this->util->lang('Numbers') => ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
+            $this->util->lang('Date and time') => ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
+            $this->util->lang('Strings') => ["character" => 0, "character varying" => 0, "text" => 0, "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
+            $this->util->lang('Binary') => ["bit" => 0, "bit varying" => 0, "bytea" => 0],
+            $this->util->lang('Network') => ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
+            $this->util->lang('Geometry') => ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0],
+        ];
+        foreach ($types as $group => $_types) {
+            $this->config->structuredTypes[$group] = array_keys($_types);
+            $this->config->types = array_merge($this->config->types, $_types);
         }
+
+        // $this->config->unsigned = [];
+        $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE", "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT IN", "IS NOT NULL"]; // no "SQL" to avoid CSRF
+        $this->config->functions = ["char_length", "lower", "round", "to_hex", "to_timestamp", "upper"];
+        $this->config->grouping = ["avg", "count", "count distinct", "max", "min", "sum"];
+        $this->config->editFunctions = [[
+            "char" => "md5",
+            "date|time" => "now",
+        ],[
+            $this->numberRegex() => "+/-",
+            "date|time" => "+ interval/- interval", //! escape
+            "char|text" => "||",
+        ]];
     }
 }

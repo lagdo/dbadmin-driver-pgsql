@@ -19,12 +19,12 @@ class Connection extends PdoConnection
     /**
     * @inheritDoc
     */
-    public function open($server, array $options)
+    public function open(string $server, array $options)
     {
         $username = $options['username'];
         $password = $options['password'];
 
-        $db = $this->server->selectedDatabase();
+        $db = $this->driver->selectedDatabase();
         //! client_encoding is supported since 9.1 but we can't yet use min_version here
         $this->dsn("pgsql:host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
             "' client_encoding=utf8 dbname='" .
@@ -33,17 +33,26 @@ class Connection extends PdoConnection
         return true;
     }
 
-    public function selectDatabase($database)
+    /**
+     * @inheritDoc
+     */
+    public function selectDatabase(string $database)
     {
-        return ($this->server->selectedDatabase() == $database);
+        return ($this->driver->selectedDatabase() == $database);
     }
 
-    public function quoteBinary($string)
+    /**
+     * @inheritDoc
+     */
+    public function quoteBinary(string $string)
     {
         return $this->quote($string);
     }
 
-    public function query($query, $unbuffered = false)
+    /**
+     * @inheritDoc
+     */
+    public function query(string $query, bool $unbuffered = false)
     {
         $return = parent::query($query, $unbuffered);
         if ($this->timeout) {
@@ -53,6 +62,9 @@ class Connection extends PdoConnection
         return $return;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function warnings()
     {
         return ''; // not implemented in PDO_PgSQL as of PHP 7.2.1
