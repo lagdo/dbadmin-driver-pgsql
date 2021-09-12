@@ -48,7 +48,7 @@ class Connection extends AbstractConnection
         $username = $options['username'];
         $password = $options['password'];
 
-        $database = $this->driver->selectedDatabase();
+        $database = $this->driver->database();
         set_error_handler(array($this, '_error'));
         $this->_string = "host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
             "' user='" . addcslashes($username, "'\\") . "' password='" . addcslashes($password, "'\\") . "'";
@@ -98,7 +98,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function quoteBinary($string)
+    public function quoteBinary(string $string)
     {
         return "'" . pg_escape_bytea($this->client, $string) . "'";
     }
@@ -106,9 +106,9 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function selectDatabase($database)
+    public function selectDatabase(string $database)
     {
-        if ($database == $this->driver->selectedDatabase()) {
+        if ($database == $this->driver->database()) {
             return $this->_database;
         }
         $client = @pg_connect("{$this->_string} dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);

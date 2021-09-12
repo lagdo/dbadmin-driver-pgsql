@@ -24,11 +24,11 @@ class Connection extends PdoConnection
         $username = $options['username'];
         $password = $options['password'];
 
-        $db = $this->driver->selectedDatabase();
+        $database = $this->driver->database();
         //! client_encoding is supported since 9.1 but we can't yet use min_version here
         $this->dsn("pgsql:host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
             "' client_encoding=utf8 dbname='" .
-            ($db != "" ? addcslashes($db, "'\\") : "postgres") . "'", $username, $password);
+            ($database != "" ? addcslashes($database, "'\\") : "postgres") . "'", $username, $password);
         //! connect without DB in case of an error
         return true;
     }
@@ -38,7 +38,7 @@ class Connection extends PdoConnection
      */
     public function selectDatabase(string $database)
     {
-        return ($this->driver->selectedDatabase() == $database);
+        return ($this->driver->database() == $database);
     }
 
     /**

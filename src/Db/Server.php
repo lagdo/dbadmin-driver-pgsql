@@ -2,14 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
-use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
-use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
 use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
-
-use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 
@@ -156,7 +149,7 @@ class Server extends AbstractServer
     public function renameDatabase(string $name, string $collation)
     {
         //! current database cannot be renamed
-        return $this->driver->queries("ALTER DATABASE " . $this->driver->escapeId($this->driver->selectedDatabase()) .
+        return $this->driver->queries("ALTER DATABASE " . $this->driver->escapeId($this->driver->database()) .
             " RENAME TO " . $this->driver->escapeId($name));
     }
 

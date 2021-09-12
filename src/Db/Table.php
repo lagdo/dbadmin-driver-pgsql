@@ -6,8 +6,6 @@ use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
 use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
-use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
-use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
 
 use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 
@@ -359,7 +357,7 @@ class Table extends AbstractTable
             "information_schema" => "infoschema",
             "pg_catalog" => "catalog",
         );
-        $link = $links[$this->driver->selectedSchema()];
+        $link = $links[$this->driver->schema()];
         if ($link) {
             return "$link-" . str_replace("_", "-", $name) . ".html";
         }

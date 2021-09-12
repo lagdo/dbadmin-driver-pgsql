@@ -2,15 +2,9 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
-use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
-use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
-use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
-
 use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 
+use Lagdo\DbAdmin\Driver\Exception\AuthException;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
 
 class Driver extends AbstractDriver
@@ -39,7 +33,8 @@ class Driver extends AbstractDriver
             throw new AuthException($this->util->lang('No package installed to connect to a PostgreSQL server.'));
         }
 
-        if ($this->connection === null) {
+        $firstConnection = ($this->connection === null);
+        if ($firstConnection) {
             $this->connection = $connection;
             $this->server = new Db\Server($this, $this->util, $connection);
             $this->table = new Db\Table($this, $this->util, $connection);
@@ -53,13 +48,13 @@ class Driver extends AbstractDriver
 
         if ($this->minVersion(9, 0)) {
             $connection->query("SET application_name = 'Adminer'");
-            if ($this->minVersion(9.2, 0)) {
-                $this->config->structuredTypes[$this->util->lang('Strings')][] = "json";
-                $this->config->types["json"] = 4294967295;
-                if ($this->minVersion(9.4, 0)) {
-                    $this->config->structuredTypes[$this->util->lang('Strings')][] = "jsonb";
-                    $this->config->types["jsonb"] = 4294967295;
-                }
+        }
+        if ($firstConnection && $this->minVersion(9.2, 0)) {
+            $this->config->structuredTypes[$this->util->lang('Strings')][] = "json";
+            $this->config->types["json"] = 4294967295;
+            if ($this->minVersion(9.4, 0)) {
+                $this->config->structuredTypes[$this->util->lang('Strings')][] = "jsonb";
+                $this->config->types["jsonb"] = 4294967295;
             }
         }
 
@@ -97,12 +92,12 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function setConfig()
+    protected function initConfig()
     {
         $this->config->jush = 'pgsql';
         $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
 
-        $types = [ //! arrays
+        $groups = [ //! arrays
             $this->util->lang('Numbers') => ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1, "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
             $this->util->lang('Date and time') => ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
             $this->util->lang('Strings') => ["character" => 0, "character varying" => 0, "text" => 0, "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
@@ -110,9 +105,9 @@ class Driver extends AbstractDriver
             $this->util->lang('Network') => ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
             $this->util->lang('Geometry') => ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0, "path" => 0, "point" => 0, "polygon" => 0],
         ];
-        foreach ($types as $group => $_types) {
-            $this->config->structuredTypes[$group] = array_keys($_types);
-            $this->config->types = array_merge($this->config->types, $_types);
+        foreach ($groups as $name => $types) {
+            $this->config->structuredTypes[$name] = array_keys($types);
+            $this->config->types = array_merge($this->config->types, $types);
         }
 
         // $this->config->unsigned = [];
