@@ -65,6 +65,37 @@ class Table extends AbstractTable
         return true;
     }
 
+
+    /**
+     * Get the primary key of a table
+     * Same as indexes(), but the columns of the primary key are returned in a array
+     *
+     * @param string $table
+     *
+     * @return array
+     */
+    private function primaryKeyColumns(string $table)
+    {
+        $indexes = [];
+        $table_oid = $this->connection->result("SELECT oid FROM pg_class WHERE " .
+            "relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()) " .
+            "AND relname = " . $this->driver->quote($table));
+        $columns = $this->driver->keyValues("SELECT attnum, attname FROM pg_attribute WHERE " .
+            "attrelid = $table_oid AND attnum > 0");
+        foreach ($this->driver->rows("SELECT relname, indisunique::int, indisprimary::int, indkey, " .
+            "indoption, (indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
+            "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid") as $row)
+        {
+            $relname = $row["relname"];
+            if ($row["indisprimary"]) {
+                foreach (explode(" ", $row["indkey"]) as $indkey) {
+                    $indexes[] = $columns[$indkey];
+                }
+            }
+        }
+        return $indexes;
+    }
+
     /**
      * @inheritDoc
      */
@@ -75,6 +106,9 @@ class Table extends AbstractTable
             'timestamp without time zone' => 'timestamp',
             'timestamp with time zone' => 'timestamptz',
         ];
+
+        // Primary keys
+        $primaryKeyColumns = $this->primaryKeyColumns($table);
 
         $identity_column = $this->driver->minVersion(10) ? 'a.attidentity' : '0';
         $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type, " .
@@ -89,6 +123,7 @@ class Table extends AbstractTable
             $field = new TableFieldEntity();
 
             $field->name = $row["field"];
+            $field->primary = \in_array($field->name, $primaryKeyColumns);
             $field->fullType = $row["full_type"];
             $field->default = $row["default"];
             $field->comment = $row["comment"];
@@ -128,7 +163,7 @@ class Table extends AbstractTable
      */
     public function indexes(string $table, ConnectionInterface $connection = null)
     {
-        if (!is_object($connection)) {
+        if (!$connection) {
             $connection = $this->connection;
         }
         $indexes = [];
