@@ -15,13 +15,6 @@ class Connection extends AbstractConnection
      *
      * @var string
      */
-    public $_string;
-
-    /**
-     * Undocumented variable
-     *
-     * @var string
-     */
     public $_database = true;
 
     /**
@@ -43,28 +36,34 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function open(string $server, array $options)
+    public function open(string $database, string $schema = '')
     {
-        $username = $options['username'];
-        $password = $options['password'];
+        $server = str_replace(":", "' port='", addcslashes($this->driver->options('server'), "'\\"));
+        $options = $this->driver->options();
+        $username = addcslashes($options['username'], "'\\");
+        $password = addcslashes($options['password'], "'\\");
+        $database = ($database) ? addcslashes($database, "'\\") : "postgres";
 
-        $database = $this->driver->database();
         set_error_handler(array($this, '_error'));
-        $this->_string = "host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
-            "' user='" . addcslashes($username, "'\\") . "' password='" . addcslashes($password, "'\\") . "'";
-        $this->client = @pg_connect("{$this->_string} dbname='" .
-            ($database != "" ? addcslashes($database, "'\\") : "postgres") . "'", PGSQL_CONNECT_FORCE_NEW);
-        if (!$this->client && $database != "") {
-            // try to connect directly with database for performance
-            $this->_database = false;
-            $this->client = @pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
-        }
+        $connString = "host='$server' user='$username' password='$password' dbname='$database'";
+        $this->client = @pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
+        // if (!$this->client && $database != "") {
+        //     // try to connect directly with database for performance
+        //     $this->_database = false;
+        //     $this->client = @pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
+        // }
         restore_error_handler();
 
         if (!$this->client) {
             return false;
         }
 
+        if ($this->driver->minVersion(9, 0)) {
+            @pg_query($this->client, "SET application_name = 'Adminer'");
+        }
+        if (($schema)) {
+            @pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema));
+        }
         pg_set_client_encoding($this->client, "UTF8");
         return true;
     }
@@ -106,24 +105,9 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function selectDatabase(string $database)
-    {
-        if ($database == $this->driver->database()) {
-            return $this->_database;
-        }
-        $client = @pg_connect("{$this->_string} dbname='" . addcslashes($database, "'\\") . "'", PGSQL_CONNECT_FORCE_NEW);
-        if ($client) {
-            $this->client = $client;
-        }
-        return $client;
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function close()
     {
-        $this->client = @pg_connect("{$this->_string} dbname='postgres'");
+        // $this->client = @pg_connect("{$this->_string} dbname='postgres'");
     }
 
     /**

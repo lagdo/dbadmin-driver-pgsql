@@ -19,26 +19,23 @@ class Connection extends PdoConnection
     /**
     * @inheritDoc
     */
-    public function open(string $server, array $options)
+    public function open(string $database, string $schema = '')
     {
+        $server = str_replace(":", "' port='", addcslashes($this->driver->options('server'), "'\\"));
+        $options = $this->driver->options();
         $username = $options['username'];
         $password = $options['password'];
+        $database = ($database) ? addcslashes($database, "'\\") : "postgres";
 
-        $database = $this->driver->database();
         //! client_encoding is supported since 9.1 but we can't yet use min_version here
-        $this->dsn("pgsql:host='" . str_replace(":", "' port='", addcslashes($server, "'\\")) .
-            "' client_encoding=utf8 dbname='" .
-            ($database != "" ? addcslashes($database, "'\\") : "postgres") . "'", $username, $password);
-        //! connect without DB in case of an error
+        $this->dsn("pgsql:host='$server' client_encoding=utf8 dbname='$database'", $username, $password);
+        if ($this->driver->minVersion(9, 0)) {
+            $this->query("SET application_name = 'Adminer'");
+        }
+        if (($schema)) {
+            $this->query("SET search_path TO " . $this->driver->escapeId($schema));
+        }
         return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function selectDatabase(string $database)
-    {
-        return ($this->driver->database() == $database);
     }
 
     /**

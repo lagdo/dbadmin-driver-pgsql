@@ -42,14 +42,17 @@ class Driver extends AbstractDriver
             $this->grammar = new Db\Grammar($this, $this->util, $this->trans, $connection);
         }
 
-        if (!$connection->open($this->options('server'), $this->options())) {
-            throw new AuthException($this->error());
-        }
+        return $connection;
+    }
 
-        if ($this->minVersion(9, 0)) {
-            $connection->query("SET application_name = 'Adminer'");
-        }
-        if ($firstConnection && $this->minVersion(9.2, 0)) {
+    /**
+     * @inheritDoc
+     */
+    public function connect(string $database, string $schema)
+    {
+        parent::connect($database, $schema);
+
+        if ($this->minVersion(9.2, 0)) {
             $this->config->structuredTypes[$this->trans->lang('Strings')][] = "json";
             $this->config->types["json"] = 4294967295;
             if ($this->minVersion(9.4, 0)) {
@@ -58,25 +61,12 @@ class Driver extends AbstractDriver
             }
         }
 
-        return $connection;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function selectSchema(string $schema, ConnectionInterface $connection = null)
-    {
-        if (!$connection) {
-            $connection = $this->connection;
-        }
-        $return = $connection->query("SET search_path TO " . $this->escapeId($schema));
         foreach ($this->userTypes() as $type) { //! get types from current_schemas('t')
             if (!isset($this->config->types[$type])) {
                 $this->config->types[$type] = 0;
                 $this->config->structuredTypes[$this->trans->lang('User types')][] = $type;
             }
         }
-        return $return;
     }
 
     /**
