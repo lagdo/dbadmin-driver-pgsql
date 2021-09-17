@@ -55,7 +55,22 @@ class Server extends AbstractServer
      */
     public function countTables(array $databases)
     {
-        return []; // would require reconnect
+        $connection = $this->driver->createConnection(); // New connection
+        $counts = [];
+        $systemSchemas = ['information_schema', 'pg_catalog', 'pg_temp_1', 'pg_toast', 'pg_toast_temp_1'];
+        $query = "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('" .
+            implode("','", $systemSchemas) . "')";
+        foreach ($databases as $database) {
+            $counts[$database] = 0;
+            if (!$connection->open($database)) {
+                continue;
+            }
+            $statement = $connection->query($query);
+            if (is_object($statement) && ($row = $statement->fetchRow())) {
+                $counts[$database] = intval($row[0]);
+            }
+        }
+        return $counts;
     }
 
     /**
