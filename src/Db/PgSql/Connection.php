@@ -119,18 +119,18 @@ class Connection extends AbstractConnection
         $this->driver->setError();
         if (!$result) {
             $this->driver->setError(pg_last_error($this->client));
-            $return = false;
+            $statement = false;
         } elseif (!pg_num_fields($result)) {
             $this->driver->setAffectedRows(pg_affected_rows($result));
-            $return = true;
+            $statement = true;
         } else {
-            $return = new Statement($result);
+            $statement = new Statement($result);
         }
         if ($this->timeout) {
             $this->timeout = 0;
             $this->query("RESET statement_timeout");
         }
-        return $return;
+        return $statement;
     }
 
     /**

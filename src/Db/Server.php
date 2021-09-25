@@ -177,13 +177,13 @@ class Server extends AbstractServer
             'FROM information_schema.routines WHERE routine_schema = current_schema() ' .
             'AND specific_name = ' . $this->driver->quote($name);
         $rows = $this->driver->rows($query);
-        $return = $rows[0];
-        $return["returns"] = ["type" => $return["type_udt_name"]];
+        $routines = $rows[0];
+        $routines["returns"] = ["type" => $routines["type_udt_name"]];
         $query = 'SELECT parameter_name AS field, data_type AS type, character_maximum_length AS length, ' .
             'parameter_mode AS inout FROM information_schema.parameters WHERE specific_schema = current_schema() ' .
             'AND specific_name = ' . $this->driver->quote($name) . ' ORDER BY ordinal_position';
-        $return["fields"] = $this->driver->rows($query);
-        return $return;
+        $routines["fields"] = $this->driver->rows($query);
+        return $routines;
     }
 
     /**
@@ -213,11 +213,11 @@ class Server extends AbstractServer
      */
     public function routineId(string $name, array $row)
     {
-        $return = [];
+        $routine = [];
         foreach ($row["fields"] as $field) {
-            $return[] = $field->type;
+            $routine[] = $field->type;
         }
-        return $this->driver->escapeId($name) . "(" . implode(", ", $return) . ")";
+        return $this->driver->escapeId($name) . "(" . implode(", ", $routine) . ")";
     }
 
     /**

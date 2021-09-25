@@ -36,7 +36,7 @@ class Grammar extends AbstractGrammar
 
     private function constraints(string $table)
     {
-        $return = [];
+        $constraints = [];
         $query = "SELECT conname, consrc FROM pg_catalog.pg_constraint " .
             "INNER JOIN pg_catalog.pg_namespace ON pg_constraint.connamespace = pg_namespace.oid " .
             "INNER JOIN pg_catalog.pg_class ON pg_constraint.conrelid = pg_class.oid " .
@@ -46,9 +46,9 @@ class Grammar extends AbstractGrammar
             $this->quote($table) . "ORDER BY connamespace, conname";
         foreach ($this->driver->rows($query) as $row)
         {
-            $return[$row['conname']] = $row['consrc'];
+            $constraints[$row['conname']] = $row['consrc'];
         }
-        return $return;
+        return $constraints;
     }
 
     /**
@@ -56,19 +56,19 @@ class Grammar extends AbstractGrammar
      */
     public function sqlForForeignKeys(string $table)
     {
-        $return = "";
+        $query = "";
 
         $status = $this->driver->tableStatus($table);
         $fkeys = $this->driver->foreignKeys($table);
         ksort($fkeys);
 
         foreach ($fkeys as $fkey_name => $fkey) {
-            $return .= "ALTER TABLE ONLY " . $this->escapeId($status->schema) . "." .
+            $query .= "ALTER TABLE ONLY " . $this->escapeId($status->schema) . "." .
                 $this->escapeId($status->name) . " ADD CONSTRAINT " . $this->escapeId($fkey_name) .
                 " {$fkey->definition} " . ($fkey->deferrable ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
         }
 
-        return ($return ? "$return\n" : $return);
+        return ($query ? "$query\n" : $query);
     }
 
     /**
@@ -76,8 +76,8 @@ class Grammar extends AbstractGrammar
      */
     public function sqlForCreateTable(string $table, bool $autoIncrement, string $style)
     {
-        $return = '';
-        $return_parts = [];
+        $query = '';
+        $clauses = [];
         $sequences = [];
 
         $status = $this->driver->tableStatus($table);
@@ -94,14 +94,14 @@ class Grammar extends AbstractGrammar
             return false;
         }
 
-        $return = "CREATE TABLE " . $this->escapeId($status->schema) . "." .
+        $query = "CREATE TABLE " . $this->escapeId($status->schema) . "." .
             $this->escapeId($status->name) . " (\n    ";
 
         // fields' definitions
         foreach ($fields as $field_name => $field) {
             $part = $this->escapeId($field->name) . ' ' . $field->fullType .
                 $this->driver->defaultValue($field) . ($field->attnotnull ? " NOT NULL" : "");
-            $return_parts[] = $part;
+            $clauses[] = $part;
 
             // sequences for fields
             if (preg_match('~nextval\(\'([^\']+)\'\)~', $field->default, $matches)) {
@@ -118,20 +118,20 @@ class Grammar extends AbstractGrammar
 
         // adding sequences before table definition
         if (!empty($sequences)) {
-            $return = implode("\n\n", $sequences) . "\n\n$return";
+            $query = implode("\n\n", $sequences) . "\n\n$query";
         }
 
         // primary + unique keys
         foreach ($indexes as $index_name => $index) {
             switch ($index->type) {
                 case 'UNIQUE':
-                    $return_parts[] = "CONSTRAINT " . $this->escapeId($index_name) .
+                    $clauses[] = "CONSTRAINT " . $this->escapeId($index_name) .
                         " UNIQUE (" . implode(', ', array_map(function ($column) {
                             return $this->escapeId($column);
                         }, $index->columns)) . ")";
                     break;
                 case 'PRIMARY':
-                    $return_parts[] = "CONSTRAINT " . $this->escapeId($index_name) .
+                    $clauses[] = "CONSTRAINT " . $this->escapeId($index_name) .
                         " PRIMARY KEY (" . implode(', ', array_map(function ($column) {
                             return $this->escapeId($column);
                         }, $index->columns)) . ")";
@@ -140,10 +140,10 @@ class Grammar extends AbstractGrammar
         }
 
         foreach ($constraints as $conname => $consrc) {
-            $return_parts[] = "CONSTRAINT " . $this->escapeId($conname) . " CHECK $consrc";
+            $clauses[] = "CONSTRAINT " . $this->escapeId($conname) . " CHECK $consrc";
         }
 
-        $return .= implode(",\n    ", $return_parts) . "\n) WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
+        $query .= implode(",\n    ", $clauses) . "\n) WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
 
         // "basic" indexes after table definition
         foreach ($indexes as $index_name => $index) {
@@ -152,7 +152,7 @@ class Grammar extends AbstractGrammar
                 foreach ($index->columns as $key => $val) {
                     $columns[] = $this->escapeId($val) . ($index->descs[$key] ? " DESC" : "");
                 }
-                $return .= "\n\nCREATE INDEX " . $this->escapeId($index_name) . " ON " .
+                $query .= "\n\nCREATE INDEX " . $this->escapeId($index_name) . " ON " .
                     $this->escapeId($status->schema) . "." . $this->escapeId($status->name) .
                     " USING btree (" . implode(', ', $columns) . ");";
             }
@@ -160,19 +160,19 @@ class Grammar extends AbstractGrammar
 
         // coments for table & fields
         if ($status->comment) {
-            $return .= "\n\nCOMMENT ON TABLE " . $this->escapeId($status->schema) . "." .
+            $query .= "\n\nCOMMENT ON TABLE " . $this->escapeId($status->schema) . "." .
                 $this->escapeId($status->name) . " IS " . $this->quote($status->comment) . ";";
         }
 
         foreach ($fields as $field_name => $field) {
             if ($field->comment) {
-                $return .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status->schema) . "." .
+                $query .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status->schema) . "." .
                     $this->escapeId($status->name) . "." . $this->escapeId($field_name) .
                     " IS " . $this->quote($field->comment) . ";";
             }
         }
 
-        return rtrim($return, ';');
+        return rtrim($query, ';');
     }
 
     /**
@@ -189,14 +189,14 @@ class Grammar extends AbstractGrammar
     public function sqlForCreateTrigger(string $table)
     {
         $status = $this->driver->tableStatus($table);
-        $return = "";
+        $query = "";
         foreach ($this->driver->triggers($table) as $trg_id => $trg) {
             $trigger = $this->driver->trigger($trg_id, $status->name);
-            $return .= "\nCREATE TRIGGER " . $this->escapeId($trigger['Trigger']) .
+            $query .= "\nCREATE TRIGGER " . $this->escapeId($trigger['Trigger']) .
                 " $trigger[Timing] $trigger[Events] ON " . $this->escapeId($status->schema) . "." .
                 $this->escapeId($status->name) . " $trigger[Type] $trigger[Statement];;\n";
         }
-        return $return;
+        return $query;
     }
 
 

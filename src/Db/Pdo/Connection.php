@@ -51,12 +51,12 @@ class Connection extends PdoConnection
      */
     public function query(string $query, bool $unbuffered = false)
     {
-        $return = parent::query($query, $unbuffered);
+        $result = parent::query($query, $unbuffered);
         if ($this->timeout) {
             $this->timeout = 0;
             parent::query("RESET statement_timeout");
         }
-        return $return;
+        return $result;
     }
 
     /**
