@@ -156,12 +156,7 @@ class Driver extends AbstractDriver
     {
         $this->config->jush = 'pgsql';
         $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
-
-        foreach ($this->types as $group => $types) {
-            $this->config->structuredTypes[$this->trans->lang($group)] = array_keys($types);
-            $this->config->types = array_merge($this->config->types, $types);
-        }
-
+        $this->config->setTypes($this->types, $this->trans);
         // $this->config->unsigned = [];
         $this->config->operators = $this->operators;
         $this->config->functions = $this->functions;
