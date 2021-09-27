@@ -14,7 +14,7 @@ class Driver extends AbstractDriver
      *
      * @var array
      */
-    private $features = ['(database', 'table', 'columns', 'sql', 'indexes', 'descidx',
+    private $features = ['database', 'table', 'columns', 'sql', 'indexes', 'descidx',
         'comment', 'view', 'scheme', 'routine', 'processlist', 'sequence', 'trigger',
         'type', 'variables', 'drop_col', 'kill', 'dump', 'fkeys_sql'];
 
@@ -124,10 +124,10 @@ class Driver extends AbstractDriver
             $this->features[] = 'materializedview';
         }
 
-        if ($this->minVersion(9.2, 0)) {
+        if ($this->minVersion(9.2)) {
             $this->config->structuredTypes[$this->trans->lang('Strings')][] = "json";
             $this->config->types["json"] = 4294967295;
-            if ($this->minVersion(9.4, 0)) {
+            if ($this->minVersion(9.4)) {
                 $this->config->structuredTypes[$this->trans->lang('Strings')][] = "jsonb";
                 $this->config->types["jsonb"] = 4294967295;
             }
@@ -146,7 +146,7 @@ class Driver extends AbstractDriver
      */
     public function support(string $feature)
     {
-        in_array($feature, $this->features);
+        return in_array($feature, $this->features);
     }
 
     /**
