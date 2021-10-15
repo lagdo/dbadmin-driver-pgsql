@@ -5,8 +5,6 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 use Lagdo\DbAdmin\Driver\Entity\StatementFieldEntity;
 
-use stdClass;
-
 class Statement implements StatementInterface
 {
     /**

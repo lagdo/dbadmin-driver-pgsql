@@ -2,8 +2,6 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
-use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
-
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
 
