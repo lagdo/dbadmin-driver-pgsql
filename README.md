@@ -1,3 +1,10 @@
+[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/lagdo/dbadmin-driver-pgsql/badges/quality-score.png?b=main)](https://scrutinizer-ci.com/g/lagdo/dbadmin-driver-pgsql/?branch=main)
+[![StyleCI](https://styleci.io/repos/400390231/shield?branch=main)](https://styleci.io/repos/400390231)
+
+[![Latest Stable Version](https://poser.pugx.org/lagdo/dbadmin-driver-pgsql/v/stable)](https://packagist.org/packages/lagdo/dbadmin-driver-pgsql)
+[![Total Downloads](https://poser.pugx.org/lagdo/dbadmin-driver-pgsql/downloads)](https://packagist.org/packages/lagdo/dbadmin-driver-pgsql)
+[![License](https://poser.pugx.org/lagdo/dbadmin-driver-pgsql/license)](https://packagist.org/packages/lagdo/dbadmin-driver-pgsql)
+
 DbAdmin drivers for PostgreSQL
 ==============================
 
