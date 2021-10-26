@@ -14,11 +14,12 @@ use Lagdo\DbAdmin\Driver\Db\Table as AbstractTable;
 class Table extends AbstractTable
 {
     /**
-     * @inheritDoc
+     * @param string $table
+     *
+     * @return array
      */
-    public function tableStatus(string $table = "", bool $fast = false)
+    private function queryStatus(string $table = '')
     {
-        $tables = [];
         $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
             "WHEN 'r' THEN 'table' WHEN 'm' THEN 'materialized view' ELSE 'view' END AS \"Engine\", " .
             "pg_relation_size(c.oid) AS \"Data_length\", " .
@@ -29,22 +30,49 @@ class Table extends AbstractTable
             "JOIN pg_namespace n ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
             "WHERE relkind IN ('r', 'm', 'v', 'f', 'p') " .
             ($table != "" ? "AND relname = " . $this->driver->quote($table) : "ORDER BY relname");
-        foreach ($this->driver->rows($query) as $row)
-        {
-            $status = new TableEntity($row['Name']);
-            $status->engine = $row['Engine'];
-            $status->schema = $row['nspname'];
-            $status->dataLength = $row['Data_length'];
-            $status->indexLength = $row['Index_length'];
-            $status->oid = $row['Oid'];
-            $status->rows = $row['Rows'];
-            $status->comment = $row['Comment'];
+        return $this->driver->rows($query);
+    }
 
-            //! Index_length, Auto_increment
-            if ($table != "") {
-                return $status;
-            }
-            $tables[$row["Name"]] = $status;
+    /**
+     * @param array $row
+     *
+     * @return TableEntity
+     */
+    private function makeStatus(array $row)
+    {
+        $status = new TableEntity($row['Name']);
+        $status->engine = $row['Engine'];
+        $status->schema = $row['nspname'];
+        $status->dataLength = $row['Data_length'];
+        $status->indexLength = $row['Index_length'];
+        $status->oid = $row['Oid'];
+        $status->rows = $row['Rows'];
+        $status->comment = $row['Comment'];
+
+        return $status;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function tableStatus(string $table, bool $fast = false)
+    {
+        $rows = $this->queryStatus($table);
+        if (!($row = reset($rows))) {
+            return null;
+        }
+        return $this->makeStatus($row);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function tablesStatuses(bool $fast = false)
+    {
+        $tables = [];
+        $rows = $this->queryStatus();
+        foreach ($rows as $row) {
+            $tables[$row["Name"]] = $this->makeStatus($row);
         }
         return $tables;
     }
@@ -86,7 +114,7 @@ class Table extends AbstractTable
             "indoption, (indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
             "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid") as $row)
         {
-            $relname = $row["relname"];
+            // $relname = $row["relname"];
             if ($row["indisprimary"]) {
                 foreach (explode(" ", $row["indkey"]) as $indkey) {
                     $indexes[] = $columns[$indkey];
@@ -224,7 +252,7 @@ class Table extends AbstractTable
                 $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
 
                 if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match2, $match10)) {
-                    $match11 = $match10[1] ?? '';
+                    // $match11 = $match10[1] ?? '';
                     $match12 = $match10[2] ?? '';
                     // $match13 = $match10[3] ?? '';
                     $match14 = $match10[4] ?? '';
@@ -283,7 +311,7 @@ class Table extends AbstractTable
         $alter = array_merge($alter, $foreign);
         if ($table == "") {
             array_unshift($queries, "CREATE TABLE " . $this->driver->table($name) . " (\n" . implode(",\n", $alter) . "\n)");
-        } elseif ($alter) {
+        } elseif (!empty($alter)) {
             array_unshift($queries, "ALTER TABLE " . $this->driver->table($table) . "\n" . implode(",\n", $alter));
         }
         if ($table != "" || $comment != "") {
@@ -303,7 +331,7 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function alterIndexes(string $table, array $alte)
+    public function alterIndexes(string $table, array $alter)
     {
         $create = [];
         $drop = [];

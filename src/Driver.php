@@ -38,7 +38,7 @@ class Driver extends AbstractDriver
      *
      * @var array
      */
-    private $unsigned = [];
+    // private $unsigned = [];
 
     /**
      * Operators used in select

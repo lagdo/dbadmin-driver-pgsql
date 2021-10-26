@@ -81,7 +81,6 @@ class Server extends AbstractServer
         return $this->driver->execute("TRUNCATE " . implode(", ", array_map(function ($table) {
             return $this->driver->table($table);
         }, $tables)));
-        return true;
     }
 
     /**
@@ -98,7 +97,7 @@ class Server extends AbstractServer
     public function dropTables(array $tables)
     {
         foreach ($tables as $table) {
-            $status = $this->tableStatus($table);
+            $status = $this->driver->tableStatus($table);
             if (!$this->driver->execute("DROP " . strtoupper($status->engine) . " " . $this->driver->table($table))) {
                 return false;
             }
@@ -112,7 +111,7 @@ class Server extends AbstractServer
     public function moveTables(array $tables, array $views, string $target)
     {
         foreach (array_merge($tables, $views) as $table) {
-            $status = $this->tableStatus($table);
+            $status = $this->driver->tableStatus($table);
             if (!$this->driver->execute("ALTER " . strtoupper($status->engine) . " " .
                 $this->driver->table($table) . " SET SCHEMA " . $this->driver->escapeId($target))) {
                 return false;

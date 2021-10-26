@@ -66,11 +66,11 @@ class Query extends AbstractQuery
     {
         $query = "EXPLAIN SELECT * FROM " . $this->driver->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");
-        if (preg_match("~ rows=([0-9]+)~", $this->connection->result($query), $regs ))
+        if (preg_match("~ rows=([0-9]+)~", $this->connection->result($query), $regs))
         {
             return $regs[1];
         }
-        return false;
+        return 0;
     }
 
     /**
@@ -78,7 +78,7 @@ class Query extends AbstractQuery
      */
     public function view(string $name)
     {
-        $status = $this->driver->tableStatus($view);
+        $status = $this->driver->tableStatus($name);
         $type = strtoupper($status->engine);
         return [
             'name' => $name,
@@ -96,8 +96,8 @@ class Query extends AbstractQuery
      */
     public function slowQuery(string $query, int $timeout)
     {
+        // $this->connection->timeout = 1000 * $timeout;
         $this->connection->query("SET statement_timeout = " . (1000 * $timeout));
-        $this->connection->timeout = 1000 * $timeout;
         return $query;
     }
 

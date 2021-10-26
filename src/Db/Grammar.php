@@ -76,7 +76,6 @@ class Grammar extends AbstractGrammar
      */
     public function sqlForCreateTable(string $table, bool $autoIncrement, string $style)
     {
-        $query = '';
         $clauses = [];
         $sequences = [];
 
@@ -91,7 +90,7 @@ class Grammar extends AbstractGrammar
         $constraints = $this->constraints($table);
 
         if (!$status || empty($fields)) {
-            return false;
+            return '';
         }
 
         $query = "CREATE TABLE " . $this->escapeId($status->schema) . "." .
