@@ -78,7 +78,7 @@ class Server extends AbstractServer
      */
     public function truncateTables(array $tables)
     {
-        return $this->driver->queries("TRUNCATE " . implode(", ", array_map(function ($table) {
+        return $this->driver->execute("TRUNCATE " . implode(", ", array_map(function ($table) {
             return $this->driver->table($table);
         }, $tables)));
         return true;
@@ -99,7 +99,7 @@ class Server extends AbstractServer
     {
         foreach ($tables as $table) {
             $status = $this->tableStatus($table);
-            if (!$this->driver->queries("DROP " . strtoupper($status->engine) . " " . $this->driver->table($table))) {
+            if (!$this->driver->execute("DROP " . strtoupper($status->engine) . " " . $this->driver->table($table))) {
                 return false;
             }
         }
@@ -113,7 +113,7 @@ class Server extends AbstractServer
     {
         foreach (array_merge($tables, $views) as $table) {
             $status = $this->tableStatus($table);
-            if (!$this->driver->queries("ALTER " . strtoupper($status->engine) . " " .
+            if (!$this->driver->execute("ALTER " . strtoupper($status->engine) . " " .
                 $this->driver->table($table) . " SET SCHEMA " . $this->driver->escapeId($target))) {
                 return false;
             }
@@ -143,7 +143,7 @@ class Server extends AbstractServer
      */
     public function createDatabase(string $database, string $collation)
     {
-        return $this->driver->queries("CREATE DATABASE " . $this->driver->escapeId($database) .
+        return $this->driver->execute("CREATE DATABASE " . $this->driver->escapeId($database) .
             ($collation ? " ENCODING " . $this->driver->escapeId($collation) : ""));
     }
 
@@ -164,7 +164,7 @@ class Server extends AbstractServer
     public function renameDatabase(string $name, string $collation)
     {
         //! current database cannot be renamed
-        return $this->driver->queries("ALTER DATABASE " . $this->driver->escapeId($this->driver->database()) .
+        return $this->driver->execute("ALTER DATABASE " . $this->driver->escapeId($this->driver->database()) .
             " RENAME TO " . $this->driver->escapeId($name));
     }
 
@@ -267,7 +267,7 @@ class Server extends AbstractServer
      */
     public function killProcess($val)
     {
-        return $this->driver->queries("SELECT pg_terminate_backend(" . $this->util->number($val) . ")");
+        return $this->driver->execute("SELECT pg_terminate_backend(" . $this->util->number($val) . ")");
     }
 
     /**

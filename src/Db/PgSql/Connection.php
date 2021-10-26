@@ -11,15 +11,11 @@ use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;
 class Connection extends AbstractConnection
 {
     /**
-     * Undocumented variable
-     *
-     * @var string
+     * @var mixed
      */
-    public $_database = true;
+    public $result;
 
     /**
-     * Undocumented variable
-     *
      * @var int
      */
     public $timeout;
@@ -91,7 +87,7 @@ class Connection extends AbstractConnection
     public function value($value, TableFieldEntity $field)
     {
         $type = $field->type;
-        return ($type == "bytea" && $val !== null ? pg_unescape_bytea($val) : $val);
+        return ($type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value);
     }
 
     /**
@@ -167,10 +163,12 @@ class Connection extends AbstractConnection
             $field = $this->defaultField();
         }
         $result = $this->query($query);
-        if (!$result || !$result->numRows) {
+        if (!$result || !$result->rowCount()) {
             return false;
         }
-        return pg_fetch_result($result->result, 0, $field);
+        // return pg_fetch_result($result->result, 0, $field);
+        $row = $result->fetchRow();
+        return is_array($row) && array_key_exists($field, $row) ? $row[$field] : false;
     }
 
     /**

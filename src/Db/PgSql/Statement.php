@@ -8,25 +8,14 @@ use Lagdo\DbAdmin\Driver\Entity\StatementFieldEntity;
 class Statement implements StatementInterface
 {
     /**
-     * Undocumented variable
-     *
-     * @var object
+     * @var resource
      */
-    public $result;
+    protected $result;
 
     /**
-     * Undocumented variable
-     *
      * @var int
      */
-    public $offset = 0;
-
-    /**
-     * Undocumented variable
-     *
-     * @var int
-     */
-    public $numRows;
+    protected $offset = 0;
 
     /**
      * The constructor
@@ -36,7 +25,14 @@ class Statement implements StatementInterface
     public function __construct($result)
     {
         $this->result = $result;
-        $this->numRows = pg_num_rows($result);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function rowCount()
+    {
+        return pg_num_rows($this->result);
     }
 
     /**

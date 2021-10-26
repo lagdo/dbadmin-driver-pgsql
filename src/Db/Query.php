@@ -28,10 +28,10 @@ class Query extends AbstractQuery
                 }
             }
             if (!(
-                ($where && $this->driver->queries("UPDATE " . $this->driver->table($table) .
+                ($where && $this->driver->execute("UPDATE " . $this->driver->table($table) .
                 " SET " . implode(", ", $update) . " WHERE " . implode(" AND ", $where)) &&
                 $this->driver->affectedRows()) ||
-                $this->driver->queries("INSERT INTO " . $this->driver->table($table) .
+                $this->driver->execute("INSERT INTO " . $this->driver->table($table) .
                 " (" . implode(", ", array_keys($set)) . ") VALUES (" . implode(", ", $set) . ")")
             )) {
                 return false;

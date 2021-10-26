@@ -293,7 +293,7 @@ class Table extends AbstractTable
             //! $queries[] = "SELECT setval(pg_get_serial_sequence(" . $this->driver->quote($name) . ", ), $autoIncrement)";
         }
         foreach ($queries as $query) {
-            if (!$this->driver->queries($query)) {
+            if (!$this->driver->execute($query)) {
                 return false;
             }
         }
@@ -330,7 +330,7 @@ class Table extends AbstractTable
             array_unshift($queries, "DROP INDEX " . implode(", ", $drop));
         }
         foreach ($queries as $query) {
-            if (!$this->driver->queries($query)) {
+            if (!$this->driver->execute($query)) {
                 return false;
             }
         }
