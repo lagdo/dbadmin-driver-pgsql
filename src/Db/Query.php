@@ -9,6 +9,8 @@ use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 
 use Lagdo\DbAdmin\Driver\Db\Query as AbstractQuery;
 
+use function strtoupper;
+
 class Query extends AbstractQuery
 {
     /**
@@ -76,8 +78,13 @@ class Query extends AbstractQuery
      */
     public function view(string $name)
     {
+        $status = $this->driver->tableStatus($view);
+        $type = strtoupper($status->engine);
         return [
-            "select" => trim($this->connection->result("SELECT pg_get_viewdef(" .
+            'name' => $name,
+            'type' => $type,
+            'materialized' => ($type != 'VIEW'),
+            'select' => trim($this->connection->result("SELECT pg_get_viewdef(" .
                 $this->connection->result("SELECT oid FROM pg_class WHERE relnamespace = " .
                 "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = " .
                 $this->driver->quote($name)) . ")"))
