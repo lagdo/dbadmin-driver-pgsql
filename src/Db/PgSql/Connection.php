@@ -88,7 +88,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value(?string $val, TableFieldEntity $field)
+    public function value($value, TableFieldEntity $field)
     {
         $type = $field->type;
         return ($type == "bytea" && $val !== null ? pg_unescape_bytea($val) : $val);
@@ -161,8 +161,11 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function result(string $query, int $field = 0)
+    public function result(string $query, int $field = -1)
     {
+        if ($field === -1) {
+            $field = $this->defaultField();
+        }
         $result = $this->query($query);
         if (!$result || !$result->numRows) {
             return false;

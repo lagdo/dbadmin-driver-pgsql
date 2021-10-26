@@ -202,6 +202,7 @@ class Table extends AbstractTable
     public function foreignKeys(string $table)
     {
         $foreignKeys = [];
+        $onActions = $this->driver->actions();
         $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid) " .
             "AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc " .
             "INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = " .
@@ -219,8 +220,8 @@ class Table extends AbstractTable
 
                 $foreignKey->source = array_map('trim', explode(',', $match1));
                 $foreignKey->target = array_map('trim', explode(',', $match3));
-                $foreignKey->onDelete = preg_match("~ON DELETE ({$this->driver->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION';
-                $foreignKey->onUpdate = preg_match("~ON UPDATE ({$this->driver->onActions})~", $match4, $match10) ? $match11 : 'NO ACTION';
+                $foreignKey->onDelete = preg_match("~ON DELETE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
+                $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
 
                 if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match2, $match10)) {
                     $match11 = $match10[1] ?? '';

@@ -19,7 +19,7 @@ class Grammar extends AbstractGrammar
      */
     public function limit(string $query, string $where, int $limit, int $offset = 0, string $separator = " ")
     {
-        return " $query$where" . ($limit !== null ? $separator . "LIMIT $limit" .
+        return " $query$where" . ($limit !== 0 ? $separator . "LIMIT $limit" .
             ($offset ? " OFFSET $offset" : "") : "");
     }
 
