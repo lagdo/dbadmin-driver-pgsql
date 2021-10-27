@@ -26,6 +26,9 @@ class Connection extends PdoConnection
         $username = $options['username'];
         $password = $options['password'];
         $database = ($database) ? addcslashes($database, "'\\") : "postgres";
+        if (!$password) {
+            $password = '';
+        }
 
         //! client_encoding is supported since 9.1 but we can't yet use min_version here
         $this->dsn("pgsql:host='$server' client_encoding=utf8 dbname='$database'", $username, $password);

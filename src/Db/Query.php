@@ -45,7 +45,7 @@ class Query extends AbstractQuery
      */
     public function lastAutoIncrementId()
     {
-        return 0; // there can be several sequences
+        return '0'; // there can be several sequences
     }
 
     /**

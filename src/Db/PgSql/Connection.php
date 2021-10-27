@@ -134,7 +134,8 @@ class Connection extends AbstractConnection
      */
     public function multiQuery($query)
     {
-        return $this->result = $this->query($query);
+        $this->statement = $this->query($query);
+        return !(!$this->statement);
     }
 
     /**
@@ -142,7 +143,7 @@ class Connection extends AbstractConnection
      */
     public function storedResult()
     {
-        return $this->result;
+        return $this->statement;
     }
 
     /**
@@ -159,16 +160,16 @@ class Connection extends AbstractConnection
      */
     public function result(string $query, int $field = -1)
     {
-        if ($field === -1) {
+        if ($field < 0) {
             $field = $this->defaultField();
         }
         $result = $this->query($query);
         if ($result === null || !$result->rowCount()) {
-            return false;
+            return null;
         }
         // return pg_fetch_result($result->result, 0, $field);
         $row = $result->fetchRow();
-        return is_array($row) && array_key_exists($field, $row) ? $row[$field] : false;
+        return is_array($row) && count($row) > $field ? $row[$field] : null;
     }
 
     /**

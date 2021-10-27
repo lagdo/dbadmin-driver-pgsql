@@ -143,8 +143,9 @@ class Server extends AbstractServer
      */
     public function createDatabase(string $database, string $collation)
     {
-        return $this->driver->execute("CREATE DATABASE " . $this->driver->escapeId($database) .
+        $result = $this->driver->execute("CREATE DATABASE " . $this->driver->escapeId($database) .
             ($collation ? " ENCODING " . $this->driver->escapeId($collation) : ""));
+        return $result == true;
     }
 
     /**
@@ -164,9 +165,10 @@ class Server extends AbstractServer
     public function renameDatabase(string $name, string $collation)
     {
         //! current database cannot be renamed
-        $this->driver->execute("ALTER DATABASE " . $this->driver->escapeId($this->driver->database()) .
-            " RENAME TO " . $this->driver->escapeId($name));
-        return true;
+        $currName = $this->driver->escapeId($this->driver->database());
+        $nextName = $this->driver->escapeId($name);
+        $result = $this->driver->execute("ALTER DATABASE $currName RENAME TO $nextName");
+        return $result == true;
     }
 
     /**
