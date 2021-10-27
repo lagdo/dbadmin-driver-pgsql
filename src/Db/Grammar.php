@@ -89,7 +89,7 @@ class Grammar extends AbstractGrammar
         ksort($indexes);
         $constraints = $this->constraints($table);
 
-        if (!$status || empty($fields)) {
+        if (empty($status) || empty($fields)) {
             return '';
         }
 

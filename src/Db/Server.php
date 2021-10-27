@@ -78,9 +78,10 @@ class Server extends AbstractServer
      */
     public function truncateTables(array $tables)
     {
-        return $this->driver->execute("TRUNCATE " . implode(", ", array_map(function ($table) {
+        $this->driver->execute("TRUNCATE " . implode(", ", array_map(function ($table) {
             return $this->driver->table($table);
         }, $tables)));
+        return true;
     }
 
     /**
@@ -163,8 +164,9 @@ class Server extends AbstractServer
     public function renameDatabase(string $name, string $collation)
     {
         //! current database cannot be renamed
-        return $this->driver->execute("ALTER DATABASE " . $this->driver->escapeId($this->driver->database()) .
+        $this->driver->execute("ALTER DATABASE " . $this->driver->escapeId($this->driver->database()) .
             " RENAME TO " . $this->driver->escapeId($name));
+        return true;
     }
 
     /**

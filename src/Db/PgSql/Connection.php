@@ -113,7 +113,7 @@ class Connection extends AbstractConnection
     {
         $result = @pg_query($this->client, $query);
         $this->driver->setError();
-        if ($result === null) {
+        if (!$result) {
             $this->driver->setError(pg_last_error($this->client));
             $statement = false;
         } elseif (!pg_num_fields($result)) {
