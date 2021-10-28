@@ -80,7 +80,7 @@ class Grammar extends AbstractGrammar
         $sequences = [];
 
         $status = $this->driver->tableStatus($table);
-        if ($this->driver->isView($status)) {
+        if ($status !== null && $this->driver->isView($status)) {
             $view = $this->driver->view($table);
             return rtrim("CREATE VIEW " . $this->escapeId($table) . " AS $view[select]", ";");
         }

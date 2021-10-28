@@ -145,7 +145,7 @@ class Server extends AbstractServer
     {
         $result = $this->driver->execute("CREATE DATABASE " . $this->driver->escapeId($database) .
             ($collation ? " ENCODING " . $this->driver->escapeId($collation) : ""));
-        return $result == true;
+        return $result !== false;
     }
 
     /**
@@ -168,7 +168,7 @@ class Server extends AbstractServer
         $currName = $this->driver->escapeId($this->driver->database());
         $nextName = $this->driver->escapeId($name);
         $result = $this->driver->execute("ALTER DATABASE $currName RENAME TO $nextName");
-        return $result == true;
+        return $result !== false;
     }
 
     /**

@@ -89,8 +89,10 @@ class Driver extends AbstractDriver
      */
     public function createConnection()
     {
-        $connection = null;
-        if (extension_loaded("pdo_pgsql")) {
+        if (extension_loaded("pgsql")) {
+            $connection = new Db\PgSql\Connection($this, $this->util, $this->trans, 'PgSQL');
+        }
+        elseif (extension_loaded("pdo_pgsql")) {
             $connection = new Db\Pdo\Connection($this, $this->util, $this->trans, 'PDO_PgSQL');
         }
         else {

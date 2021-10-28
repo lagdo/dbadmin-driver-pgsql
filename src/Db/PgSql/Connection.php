@@ -42,11 +42,11 @@ class Connection extends AbstractConnection
 
         set_error_handler(array($this, '_error'));
         $connString = "host='$server' user='$username' password='$password' dbname='$database'";
-        $this->client = @pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
+        $this->client = pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
         // if (!$this->client && $database != "") {
         //     // try to connect directly with database for performance
         //     $this->_database = false;
-        //     $this->client = @pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
+        //     $this->client = pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
         // }
         restore_error_handler();
 
@@ -55,10 +55,14 @@ class Connection extends AbstractConnection
         }
 
         if ($this->driver->minVersion(9, 0)) {
-            @pg_query($this->client, "SET application_name = 'Adminer'");
+            if (pg_query($this->client, "SET application_name = 'Adminer'") === false) {
+                $this->driver->setError(pg_last_error($this->client));
+            }
         }
         if (($schema)) {
-            @pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema));
+            if (pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema)) === false) {
+                $this->driver->setError(pg_last_error($this->client));
+            }
         }
         pg_set_client_encoding($this->client, "UTF8");
         return true;
@@ -103,7 +107,7 @@ class Connection extends AbstractConnection
      */
     public function close()
     {
-        // $this->client = @pg_connect("{$this->_string} dbname='postgres'");
+        // $this->client = pg_connect("{$this->_string} dbname='postgres'");
     }
 
     /**
@@ -111,9 +115,9 @@ class Connection extends AbstractConnection
      */
     public function query(string $query, bool $unbuffered = false)
     {
-        $result = @pg_query($this->client, $query);
+        $result = pg_query($this->client, $query);
         $this->driver->setError();
-        if (!$result) {
+        if ($result === false) {
             $this->driver->setError(pg_last_error($this->client));
             $statement = false;
         } elseif (!pg_num_fields($result)) {
