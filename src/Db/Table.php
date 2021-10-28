@@ -6,6 +6,7 @@ use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
 use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
+use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
 
 use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 
@@ -368,22 +369,25 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function trigger(string $trigger/*, $table = null*/)
+    public function trigger(string $name, string $table = '')
     {
-        if ($trigger == "") {
-            return ["Statement" => "EXECUTE PROCEDURE ()"];
+        if ($name == '') {
+            return new TriggerEntity('', '', 'EXECUTE PROCEDURE ()');
         }
-        // if ($table === null) {
+        if ($table === '') {
             $table = $this->util->input()->getTable();
-        // }
+        }
         $query = 'SELECT t.trigger_name AS "Trigger", t.action_timing AS "Timing", ' .
             '(SELECT STRING_AGG(event_manipulation, \' OR \') FROM information_schema.triggers ' .
             'WHERE event_object_table = t.event_object_table AND trigger_name = t.trigger_name ) AS "Events", ' .
             't.event_manipulation AS "Event", \'FOR EACH \' || t.action_orientation AS "Type", ' .
             't.action_statement AS "Statement" FROM information_schema.triggers t WHERE t.event_object_table = ' .
-            $this->driver->quote($table) . ' AND t.trigger_name = ' . $this->driver->quote($trigger);
+            $this->driver->quote($table) . ' AND t.trigger_name = ' . $this->driver->quote($name);
         $rows = $this->driver->rows($query);
-        return reset($rows);
+        if (!($row = reset($rows))) {
+            return null;
+        }
+        return new TriggerEntity($row['Timing'], $row['Event'], $row['Statement'], '', $row['Trigger']);
     }
 
     /**
@@ -395,7 +399,8 @@ class Table extends AbstractTable
         $query = "SELECT * FROM information_schema.triggers WHERE trigger_schema = current_schema() " .
             "AND event_object_table = " . $this->driver->quote($table);
         foreach ($this->driver->rows($query) as $row) {
-            $triggers[$row["trigger_name"]] = new Trigger($row["action_timing"], $row["event_manipulation"]);
+            $triggers[$row["trigger_name"]] = new TriggerEntity($row["action_timing"],
+                $row["event_manipulation"], '', '', $row["trigger_name"]);
         }
         return $triggers;
     }
@@ -417,10 +422,10 @@ class Table extends AbstractTable
      */
     public function tableHelp(string $name)
     {
-        $links = array(
+        $links = [
             "information_schema" => "infoschema",
             "pg_catalog" => "catalog",
-        );
+        ];
         $link = $links[$this->driver->schema()];
         if ($link) {
             return "$link-" . str_replace("_", "-", $name) . ".html";

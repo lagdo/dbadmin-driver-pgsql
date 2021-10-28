@@ -139,7 +139,7 @@ class Connection extends AbstractConnection
     public function multiQuery($query)
     {
         $this->statement = $this->query($query);
-        return !(!$this->statement);
+        return $this->statement !== false;
     }
 
     /**
