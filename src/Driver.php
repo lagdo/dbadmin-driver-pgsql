@@ -162,4 +162,21 @@ class Driver extends AbstractDriver
         $this->config->editFunctions = $this->editFunctions;
         $this->config->editFunctions[1][$this->numberRegex()] = "+/-";
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function error()
+    {
+        $message = parent::error();
+        if (preg_match('~^(.*\n)?([^\n]*)\n( *)\^(\n.*)?$~s', $message, $match)) {
+            $match1 = $match[1] ?? '';
+            $match2 = $match[2] ?? '';
+            $match3 = $match[3] ?? '';
+            $match4 = $match[4] ?? '';
+            $message = $match1 . preg_replace('~((?:[^&]|&[^;]*;){' .
+                strlen($match3) . '})(.*)~', '\1<b>\2</b>', $match2) . $match4;
+        }
+        return $this->util->convertEolToHtml($message);
+    }
 }
