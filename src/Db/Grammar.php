@@ -23,17 +23,6 @@ class Grammar extends AbstractGrammar
             ($offset ? " OFFSET $offset" : "") : "");
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function limitToOne(string $table, string $query, string $where, string $separator = "\n")
-    {
-        return (preg_match('~^INTO~', $query) ? $this->limit($query, $where, 1, 0, $separator) :
-            " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ? $where :
-            " WHERE ctid = (SELECT ctid FROM " . $this->table($table) . $where . $separator . "LIMIT 1)")
-        );
-    }
-
     private function constraints(string $table)
     {
         $constraints = [];
@@ -43,7 +32,7 @@ class Grammar extends AbstractGrammar
             "AND pg_constraint.connamespace = pg_class.relnamespace WHERE pg_constraint.contype = 'c' " .
             // "-- handle only CONSTRAINTs here, not TYPES " .
             "AND conrelid != 0  AND nspname = current_schema() AND relname = " .
-            $this->quote($table) . "ORDER BY connamespace, conname";
+            $this->driver->quote($table) . "ORDER BY connamespace, conname";
         foreach ($this->driver->rows($query) as $row)
         {
             $constraints[$row['conname']] = $row['consrc'];
@@ -108,7 +97,7 @@ class Grammar extends AbstractGrammar
                 $sq = reset($this->driver->rows($this->driver->minVersion(10) ?
                     "SELECT *, cache_size AS cache_value FROM pg_sequences " .
                     "WHERE schemaname = current_schema() AND sequencename = " .
-                    $this->quote($sequence_name) : "SELECT * FROM $sequence_name"));
+                    $this->driver->quote($sequence_name) : "SELECT * FROM $sequence_name"));
                 $sequences[] = ($style == "DROP+CREATE" ? "DROP SEQUENCE IF EXISTS $sequence_name;\n" : "") .
                     "CREATE SEQUENCE $sequence_name INCREMENT $sq[increment_by] MINVALUE $sq[min_value] MAXVALUE $sq[max_value]" .
                     ($autoIncrement && $sq['last_value'] ? " START $sq[last_value]" : "") . " CACHE $sq[cache_value];";
@@ -160,14 +149,14 @@ class Grammar extends AbstractGrammar
         // coments for table & fields
         if ($status->comment) {
             $query .= "\n\nCOMMENT ON TABLE " . $this->escapeId($status->schema) . "." .
-                $this->escapeId($status->name) . " IS " . $this->quote($status->comment) . ";";
+                $this->escapeId($status->name) . " IS " . $this->driver->quote($status->comment) . ";";
         }
 
         foreach ($fields as $field_name => $field) {
             if ($field->comment) {
                 $query .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status->schema) . "." .
                     $this->escapeId($status->name) . "." . $this->escapeId($field_name) .
-                    " IS " . $this->quote($field->comment) . ";";
+                    " IS " . $this->driver->quote($field->comment) . ";";
             }
         }
 

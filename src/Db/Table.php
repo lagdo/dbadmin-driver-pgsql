@@ -68,12 +68,25 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function tablesStatuses(bool $fast = false)
+    public function tableStatuses(bool $fast = false)
     {
         $tables = [];
         $rows = $this->queryStatus();
         foreach ($rows as $row) {
             $tables[$row["Name"]] = $this->makeStatus($row);
+        }
+        return $tables;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function tableNames()
+    {
+        $tables = [];
+        $rows = $this->queryStatus();
+        foreach ($rows as $row) {
+            $tables[] = $row["Name"];
         }
         return $tables;
     }
@@ -94,6 +107,31 @@ class Table extends AbstractTable
         return true;
     }
 
+    /**
+     * @inheritDoc
+     */
+    public function referencableTables(string $table)
+    {
+        $fields = []; // table_name => [field]
+        foreach ($this->tableNames() as $tableName) {
+            if ($tableName === $table) {
+                continue;
+            }
+            foreach ($this->fields($tableName) as $field) {
+                if ($field->primary) {
+                    if (!isset($fields[$tableName])) {
+                        $fields[$tableName] = $field;
+                    } else {
+                        // No multi column primary key
+                        $fields[$tableName] = null;
+                    }
+                }
+            }
+        }
+        return array_filter($fields, function($field) {
+            return $field !== null;
+        });
+    }
 
     /**
      * Get the primary key of a table
@@ -265,105 +303,6 @@ class Table extends AbstractTable
             }
         }
         return $foreignKeys;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function alterTable(string $table, string $name, array $fields, array $foreign,
-        string $comment, string $engine, string $collation, int $autoIncrement, string $partitioning)
-    {
-        $alter = [];
-        $queries = [];
-        if ($table != "" && $table != $name) {
-            $queries[] = "ALTER TABLE " . $this->driver->table($table) . " RENAME TO " . $this->driver->table($name);
-        }
-        foreach ($fields as $field) {
-            $column = $this->driver->escapeId($field[0]);
-            $val = $field[1];
-            if (!$val) {
-                $alter[] = "DROP $column";
-            } else {
-                $val5 = $val[5];
-                unset($val[5]);
-                if ($field[0] == "") {
-                    if (isset($val[6])) { // auto increment
-                        $val[1] = ($val[1] == " bigint" ? " big" : ($val[1] == " smallint" ? " small" : " ")) . "serial";
-                    }
-                    $alter[] = ($table != "" ? "ADD " : "  ") . implode($val);
-                    if (isset($val[6])) {
-                        $alter[] = ($table != "" ? "ADD" : " ") . " PRIMARY KEY ($val[0])";
-                    }
-                } else {
-                    if ($column != $val[0]) {
-                        $queries[] = "ALTER TABLE " . $this->driver->table($name) . " RENAME $column TO $val[0]";
-                    }
-                    $alter[] = "ALTER $column TYPE$val[1]";
-                    if (!$val[6]) {
-                        $alter[] = "ALTER $column " . ($val[3] ? "SET$val[3]" : "DROP DEFAULT");
-                        $alter[] = "ALTER $column " . ($val[2] == " NULL" ? "DROP NOT" : "SET") . $val[2];
-                    }
-                }
-                if ($field[0] != "" || $val5 != "") {
-                    $queries[] = "COMMENT ON COLUMN " . $this->driver->table($name) . ".$val[0] IS " . ($val5 != "" ? substr($val5, 9) : "''");
-                }
-            }
-        }
-        $alter = array_merge($alter, $foreign);
-        if ($table == "") {
-            array_unshift($queries, "CREATE TABLE " . $this->driver->table($name) . " (\n" . implode(",\n", $alter) . "\n)");
-        } elseif (!empty($alter)) {
-            array_unshift($queries, "ALTER TABLE " . $this->driver->table($table) . "\n" . implode(",\n", $alter));
-        }
-        if ($table != "" || $comment != "") {
-            $queries[] = "COMMENT ON TABLE " . $this->driver->table($name) . " IS " . $this->driver->quote($comment);
-        }
-        if ($autoIncrement != "") {
-            //! $queries[] = "SELECT setval(pg_get_serial_sequence(" . $this->driver->quote($name) . ", ), $autoIncrement)";
-        }
-        foreach ($queries as $query) {
-            if (!$this->driver->execute($query)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function alterIndexes(string $table, array $alter)
-    {
-        $create = [];
-        $drop = [];
-        $queries = [];
-        foreach ($alter as $val) {
-            if ($val[0] != "INDEX") {
-                //! descending UNIQUE indexes results in syntax error
-                $create[] = (
-                    $val[2] == "DROP" ? "\nDROP CONSTRAINT " . $this->driver->escapeId($val[1]) :
-                    "\nADD" . ($val[1] != "" ? " CONSTRAINT " . $this->driver->escapeId($val[1]) : "") .
-                    " $val[0] " . ($val[0] == "PRIMARY" ? "KEY " : "") . "(" . implode(", ", $val[2]) . ")"
-                );
-            } elseif ($val[2] == "DROP") {
-                $drop[] = $this->driver->escapeId($val[1]);
-            } else {
-                $queries[] = "CREATE INDEX " . $this->driver->escapeId($val[1] != "" ? $val[1] : uniqid($table . "_")) .
-                    " ON " . $this->driver->table($table) . " (" . implode(", ", $val[2]) . ")";
-            }
-        }
-        if ($create) {
-            array_unshift($queries, "ALTER TABLE " . $this->driver->table($table) . implode(",", $create));
-        }
-        if ($drop) {
-            array_unshift($queries, "DROP INDEX " . implode(", ", $drop));
-        }
-        foreach ($queries as $query) {
-            if (!$this->driver->execute($query)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**

@@ -16,7 +16,7 @@
         "source": "https://github.com/lagdo/dbadmin-driver-pgsql"
     },
     "require": {
-        "lagdo/dbadmin-driver": "^0.2",
+        "lagdo/dbadmin-driver": "^0.3",
         "jaxon-php/jaxon-core": "*"
     },
     "require-dev": {

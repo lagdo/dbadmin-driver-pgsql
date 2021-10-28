@@ -121,7 +121,7 @@ class Connection extends AbstractConnection
             $this->driver->setError(pg_last_error($this->client));
             $statement = false;
         } elseif (!pg_num_fields($result)) {
-            $this->driver->setAffectedRows(pg_affected_rows($result));
+            $this->setAffectedRows(pg_affected_rows($result));
             $statement = true;
         } else {
             $statement = new Statement($result);
