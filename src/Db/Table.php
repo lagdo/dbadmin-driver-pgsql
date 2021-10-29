@@ -164,6 +164,50 @@ class Table extends AbstractTable
     }
 
     /**
+     * @param array $row
+     * @param array $primaryKeyColumns
+     *
+     * @return TableFieldEntity
+     */
+    private function makeFieldEntity(array $row, array $primaryKeyColumns)
+    {
+        $field = new TableFieldEntity();
+
+        $field->name = $row["field"];
+        $field->primary = \in_array($field->name, $primaryKeyColumns);
+        $field->fullType = $row["full_type"];
+        $field->default = $row["default"];
+        $field->comment = $row["comment"];
+        //! No collation, no info about primary keys
+        preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $field->fullType, $match);
+        list(, $type, $length, $field->length, $addon, $array) = $match;
+        $field->length .= $array;
+        $check_type = $type . $addon;
+        if (isset($aliases[$check_type])) {
+            $field->type = $aliases[$check_type];
+            $field->fullType = $field->type . $length . $array;
+        } else {
+            $field->type = $type;
+            $field->fullType = $field->type . $length . $addon . $array;
+        }
+        if (in_array($row['identity'], ['a', 'd'])) {
+            $field->default = 'GENERATED ' .
+                ($row['identity'] == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
+        }
+        $field->null = !$row["attnotnull"];
+        $field->autoIncrement = $row['identity'] || preg_match('~^nextval\(~i', $row["default"]);
+        $field->privileges = ["insert" => 1, "select" => 1, "update" => 1];
+        if (preg_match('~(.+)::[^,)]+(.*)~', $row["default"], $match)) {
+            $match1 = $match[1] ?? '';
+            $match10 = $match1[0] ?? '';
+            $match2 = $match[2] ?? '';
+            $field->default = ($match1 == "NULL" ? null :
+                (($match10 == "'" ? $this->driver->unescapeId($match1) : $match1) . $match2));
+        }
+        return $field;
+    }
+
+    /**
      * @inheritDoc
      */
     public function fields(string $table)
@@ -187,42 +231,34 @@ class Table extends AbstractTable
             " AND n.nspname = current_schema() AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
         foreach ($this->driver->rows($query) as $row)
         {
-            $field = new TableFieldEntity();
-
-            $field->name = $row["field"];
-            $field->primary = \in_array($field->name, $primaryKeyColumns);
-            $field->fullType = $row["full_type"];
-            $field->default = $row["default"];
-            $field->comment = $row["comment"];
-            //! No collation, no info about primary keys
-            preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $field->fullType, $match);
-            list(, $type, $length, $field->length, $addon, $array) = $match;
-            $field->length .= $array;
-            $check_type = $type . $addon;
-            if (isset($aliases[$check_type])) {
-                $field->type = $aliases[$check_type];
-                $field->fullType = $field->type . $length . $array;
-            } else {
-                $field->type = $type;
-                $field->fullType = $field->type . $length . $addon . $array;
-            }
-            if (in_array($row['identity'], ['a', 'd'])) {
-                $field->default = 'GENERATED ' . ($row['identity'] == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
-            }
-            $field->null = !$row["attnotnull"];
-            $field->autoIncrement = $row['identity'] || preg_match('~^nextval\(~i', $row["default"]);
-            $field->privileges = ["insert" => 1, "select" => 1, "update" => 1];
-            if (preg_match('~(.+)::[^,)]+(.*)~', $row["default"], $match)) {
-                $match1 = $match[1] ?? '';
-                $match10 = $match1[0] ?? '';
-                $match2 = $match[2] ?? '';
-                $field->default = ($match1 == "NULL" ? null :
-                    (($match10 == "'" ? $this->driver->unescapeId($match1) : $match1) . $match2));
-            }
-
-            $fields[$field->name] = $field;
+            $fields[$row["field"]] = $this->makeFieldEntity($row, $primaryKeyColumns);
         }
         return $fields;
+    }
+
+    /**
+     * @param array $row
+     * @param array $columns
+     *
+     * @return IndexEntity
+     */
+    private function makeIndexEntity(array $row, array $columns)
+    {
+        $index = new IndexEntity();
+
+        $index->type = ($row["indispartial"] ? "INDEX" :
+            ($row["indisprimary"] ? "PRIMARY" : ($row["indisunique"] ? "UNIQUE" : "INDEX")));
+        $index->columns = [];
+        foreach (explode(" ", $row["indkey"]) as $indkey) {
+            $index->columns[] = $columns[$indkey];
+        }
+        $index->descs = [];
+        foreach (explode(" ", $row["indoption"]) as $indoption) {
+            $index->descs[] = ($indoption & 1 ? '1' : null); // 1 - INDOPTION_DESC
+        }
+        $index->lengths = [];
+
+        return $index;
     }
 
     /**
@@ -239,28 +275,51 @@ class Table extends AbstractTable
             "AND relname = " . $this->driver->quote($table));
         $columns = $this->driver->keyValues("SELECT attnum, attname FROM pg_attribute WHERE " .
             "attrelid = $table_oid AND attnum > 0", $connection);
-        foreach ($this->driver->rows("SELECT relname, indisunique::int, indisprimary::int, indkey, " .
-            "indoption, (indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
-            "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid", $connection) as $row)
+        $query = "SELECT relname, indisunique::int, indisprimary::int, indkey, indoption, " .
+            "(indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
+            "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid";
+        foreach ($this->driver->rows($query, $connection) as $row)
         {
-            $index = new IndexEntity();
-
-            $relname = $row["relname"];
-            $index->type = ($row["indispartial"] ? "INDEX" :
-                ($row["indisprimary"] ? "PRIMARY" : ($row["indisunique"] ? "UNIQUE" : "INDEX")));
-            $index->columns = [];
-            foreach (explode(" ", $row["indkey"]) as $indkey) {
-                $index->columns[] = $columns[$indkey];
-            }
-            $index->descs = [];
-            foreach (explode(" ", $row["indoption"]) as $indoption) {
-                $index->descs[] = ($indoption & 1 ? '1' : null); // 1 - INDOPTION_DESC
-            }
-            $index->lengths = [];
-
-            $indexes[$relname] = $index;
+            $indexes[$row["relname"]] = $this->makeIndexEntity($row, $columns);
         }
         return $indexes;
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return ForeignKeyEntity
+     */
+    private function makeForeignKeyEntity(array $row)
+    {
+        if (!preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
+            return null;
+        }
+        $onActions = $this->driver->actions();
+
+        $match1 = $match[1] ?? '';
+        $match2 = $match[2] ?? '';
+        $match3 = $match[3] ?? '';
+        $match4 = $match[4] ?? '';
+        $match11 = '';
+
+        $foreignKey = new ForeignKeyEntity();
+
+        $foreignKey->source = array_map('trim', explode(',', $match1));
+        $foreignKey->target = array_map('trim', explode(',', $match3));
+        $foreignKey->onDelete = preg_match("~ON DELETE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
+        $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
+
+        if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match2, $match10)) {
+            // $match11 = $match10[1] ?? '';
+            $match12 = $match10[2] ?? '';
+            // $match13 = $match10[3] ?? '';
+            $match14 = $match10[4] ?? '';
+            $foreignKey->schema = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match12));
+            $foreignKey->table = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match14));
+        }
+
+        return $foreignKey;
     }
 
     /**
@@ -269,36 +328,14 @@ class Table extends AbstractTable
     public function foreignKeys(string $table)
     {
         $foreignKeys = [];
-        $onActions = $this->driver->actions();
         $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid) " .
             "AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc " .
             "INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = " .
             $this->driver->quote($table) .
             " AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conname";
         foreach ($this->driver->rows($query) as $row) {
-            if (preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
-                $match1 = $match[1] ?? '';
-                $match2 = $match[2] ?? '';
-                $match3 = $match[3] ?? '';
-                $match4 = $match[4] ?? '';
-                $match11 = '';
-
-                $foreignKey = new ForeignKeyEntity();
-
-                $foreignKey->source = array_map('trim', explode(',', $match1));
-                $foreignKey->target = array_map('trim', explode(',', $match3));
-                $foreignKey->onDelete = preg_match("~ON DELETE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
-                $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~", $match4, $match10) ? $match11 : 'NO ACTION';
-
-                if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match2, $match10)) {
-                    // $match11 = $match10[1] ?? '';
-                    $match12 = $match10[2] ?? '';
-                    // $match13 = $match10[3] ?? '';
-                    $match14 = $match10[4] ?? '';
-                    $foreignKey->schema = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match12));
-                    $foreignKey->table = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match14));
-                }
-
+            $foreignKey = $this->makeForeignKeyEntity($row);
+            if ($foreignKey !== null) {
                 $foreignKeys[$row['conname']] = $foreignKey;
             }
         }
