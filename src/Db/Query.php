@@ -16,12 +16,11 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    protected function limitToOne(string $table, string $query, string $where, string $separator = "\n")
+    protected function limitToOne(string $table, string $query, string $where)
     {
-        return (preg_match('~^INTO~', $query) ? $this->driver->limit($query, $where, 1, 0, $separator) :
+        return (preg_match('~^INTO~', $query) ? $this->driver->limit($query, $where, 1, 0) :
             " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ? $where :
-            " WHERE ctid = (SELECT ctid FROM " . $this->driver->table($table) . $where . $separator . "LIMIT 1)")
-        );
+            " WHERE ctid = (SELECT ctid FROM " . $this->driver->table($table) . $where . ' LIMIT 1)'));
     }
 
     /**

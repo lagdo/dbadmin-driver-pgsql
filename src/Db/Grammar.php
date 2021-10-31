@@ -14,15 +14,6 @@ class Grammar extends AbstractGrammar
         return '"' . str_replace('"', '""', $idf) . '"';
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function limit(string $query, string $where, int $limit, int $offset = 0, string $separator = " ")
-    {
-        return " $query$where" . ($limit !== 0 ? $separator . "LIMIT $limit" .
-            ($offset ? " OFFSET $offset" : "") : "");
-    }
-
     private function constraints(string $table)
     {
         $constraints = [];
