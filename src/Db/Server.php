@@ -49,7 +49,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function isInformationSchema($database)
+    public function isInformationSchema(string $database)
     {
         return ($database == "information_schema");
     }
