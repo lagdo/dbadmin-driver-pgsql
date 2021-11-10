@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
+use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
 
 use Lagdo\DbAdmin\Driver\Db\Database as AbstractDatabase;
@@ -9,63 +10,121 @@ use Lagdo\DbAdmin\Driver\Db\Database as AbstractDatabase;
 class Database extends AbstractDatabase
 {
     /**
-     * @inheritDoc
+     * Get queries to create or alter table.
+     *
+     * @param TableEntity $tableAttrs
+     *
+     * @return array
      */
-    public function alterTable(string $table, string $name, array $fields, array $foreign,
-        string $comment, string $engine, string $collation, int $autoIncrement, string $partitioning)
+    private function getQueries(TableEntity $tableAttrs)
     {
-        $alter = [];
         $queries = [];
-        if ($table != '' && $table != $name) {
-            $queries[] = 'ALTER TABLE ' . $this->driver->table($table) . ' RENAME TO ' . $this->driver->table($name);
-        }
-        foreach ($fields as $field) {
+
+        foreach ($tableAttrs->edited as $field) {
             $column = $this->driver->escapeId($field[0]);
             $val = $field[1];
-            if (!$val) {
-                $alter[] = "DROP $column";
-            } else {
-                $val5 = $val[5];
-                unset($val[5]);
-                if ($field[0] == '') {
-                    if (isset($val[6])) { // auto increment
-                        $val[1] = ($val[1] == ' bigint' ? ' big' : ($val[1] == ' smallint' ? ' small' : ' ')) . 'serial';
-                    }
-                    $alter[] = ($table != '' ? 'ADD ' : '  ') . implode($val);
-                    if (isset($val[6])) {
-                        $alter[] = ($table != '' ? 'ADD' : ' ') . " PRIMARY KEY ($val[0])";
-                    }
-                } else {
-                    if ($column != $val[0]) {
-                        $queries[] = 'ALTER TABLE ' . $this->driver->table($name) . " RENAME $column TO $val[0]";
-                    }
-                    $alter[] = "ALTER $column TYPE$val[1]";
-                    if (!$val[6]) {
-                        $alter[] = "ALTER $column " . ($val[3] ? "SET$val[3]" : 'DROP DEFAULT');
-                        $alter[] = "ALTER $column " . ($val[2] == ' NULL' ? 'DROP NOT' : 'SET') . $val[2];
-                    }
-                }
-                if ($field[0] != '' || $val5 != '') {
-                    $queries[] = 'COMMENT ON COLUMN ' . $this->driver->table($name) . ".$val[0] IS " . ($val5 != '' ? substr($val5, 9) : "''");
-                }
+            $val5 = $val[5] ?? '';
+            if ($val[0] !== '' && $column != $val[0]) {
+                $queries[] = 'ALTER TABLE ' . $this->driver->table($tableAttrs->name) . " RENAME $column TO $val[0]";
+            }
+            if ($column !== '' || $val5 !== '') {
+                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->table($tableAttrs->name) .
+                    ".$val[0] IS " . ($val5 != '' ? substr($val5, 9) : "''");
             }
         }
-        $alter = array_merge($alter, $foreign);
-        if ($table == '') {
-            array_unshift($queries, 'CREATE TABLE ' . $this->driver->table($name) . " (\n" . implode(",\n", $alter) . "\n)");
-        } elseif (!empty($alter)) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) . "\n" . implode(",\n", $alter));
+        foreach ($tableAttrs->fields as $field) {
+            $column = $this->driver->escapeId($field[0]);
+            $val = $field[1];
+            $val5 = $val[5] ?? '';
+            if ($column !== '' || $val5 !== '') {
+                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->table($tableAttrs->name) .
+                    ".$val[0] IS " . ($val5 != '' ? substr($val5, 9) : "''");
+            }
         }
-        if ($table != '' || $comment != '') {
-            $queries[] = 'COMMENT ON TABLE ' . $this->driver->table($name) . ' IS ' . $this->driver->quote($comment);
+        if ($tableAttrs->comment != '') {
+            $queries[] = 'COMMENT ON TABLE ' . $this->driver->table($tableAttrs->name) .
+                ' IS ' . $this->driver->quote($tableAttrs->comment);
         }
-        if ($autoIncrement != '') {
-            //! $queries[] = 'SELECT setval(pg_get_serial_sequence(' . $this->driver->quote($name) . ', ), $autoIncrement)';
+
+        return $queries;
+    }
+
+    /**
+     * Get queries to create or alter table.
+     *
+     * @param TableEntity $tableAttrs
+     *
+     * @return array
+     */
+    private function getNewColumns(TableEntity $tableAttrs)
+    {
+        $columns = [];
+
+        foreach ($tableAttrs->fields as $field) {
+            $column = $this->driver->escapeId($field[0]);
+            $val = $field[1];
+            if (isset($val[6])) { // auto increment
+                $val[1] = ($val[1] == ' bigint' ? ' big' : ($val[1] == ' smallint' ? ' small' : ' ')) . 'serial';
+            }
+            $columns[] = implode($val);
+            if (isset($val[6])) {
+                $columns[] = " PRIMARY KEY ($val[0])";
+            }
         }
+
+        return $columns;
+    }
+
+    /**
+     * Get queries to create or alter table.
+     *
+     * @param TableEntity $tableAttrs
+     *
+     * @return array
+     */
+    private function getColumnChanges(TableEntity $tableAttrs)
+    {
+        $columns = [];
+
+        foreach ($tableAttrs->fields as $field) {
+            $column = $this->driver->escapeId($field[0]);
+            $val = $field[1];
+            if (isset($val[6])) { // auto increment
+                $val[1] = ($val[1] == ' bigint' ? ' big' : ($val[1] == ' smallint' ? ' small' : ' ')) . 'serial';
+            }
+            $columns[] = 'ADD ' . implode($val);
+            if (isset($val[6])) {
+                $columns[] = "ADD PRIMARY KEY ($val[0])";
+            }
+        }
+        foreach ($tableAttrs->edited as $field) {
+            $column = $this->driver->escapeId($field[0]);
+            $val = $field[1];
+            $columns[] = "ALTER $column TYPE$val[1]";
+            if (!$val[6]) {
+                $columns[] = "ALTER $column " . ($val[3] ? "SET$val[3]" : 'DROP DEFAULT');
+                $columns[] = "ALTER $column " . ($val[2] == ' NULL' ? 'DROP NOT' : 'SET') . $val[2];
+            }
+        }
+        foreach ($tableAttrs->dropped as $column) {
+            $columns[] = 'DROP ' . $this->driver->execute($column);
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createTable(TableEntity $tableAttrs)
+    {
+        $queries = $this->getQueries($tableAttrs);
+        $columns = $this->getNewColumns($tableAttrs);
+        $columns = array_merge($columns, $tableAttrs->foreign);
+        array_unshift($queries, 'CREATE TABLE ' . $this->driver->table($tableAttrs->name) .
+            '(' . implode(', ', $columns) . ')');
         foreach ($queries as $query) {
-            if (!$this->driver->execute($query)) {
-                return false;
-            }
+            $this->driver->execute($query);
         }
         return true;
     }
@@ -73,36 +132,58 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function alterIndexes(string $table, array $alter)
+    public function alterTable(string $table, TableEntity $tableAttrs)
     {
-        $create = [];
-        $drop = [];
+        $queries = $this->getQueries($tableAttrs);
+        $columns = $this->getColumnChanges($tableAttrs);
+        if ($tableAttrs->name !== '' && $table !== $tableAttrs->name) {
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) .
+                ' RENAME TO ' . $this->driver->table($tableAttrs->name));
+        }
+        $columns = array_merge($columns, $tableAttrs->foreign);
+        if (!empty($columns)) {
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) . ' ' . implode(', ', $columns));
+        }
+        // if ($tableAttrs->autoIncrement != '') {
+        //     //! $queries[] = 'SELECT setval(pg_get_serial_sequence(' . $this->driver->quote($tableAttrs->name) . ', ), $tableAttrs->autoIncrement)';
+        // }
+        foreach ($queries as $query) {
+            $this->driver->execute($query);
+        }
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function alterIndexes(string $table, array $alter, array $drop)
+    {
         $queries = [];
-        foreach ($alter as $val) {
-            if ($val[0] != 'INDEX') {
-                //! descending UNIQUE indexes results in syntax error
-                $create[] = (
-                    $val[2] == 'DROP' ? "\nDROP CONSTRAINT " . $this->driver->escapeId($val[1]) :
-                    "\nADD" . ($val[1] != '' ? ' CONSTRAINT ' . $this->driver->escapeId($val[1]) : '') .
-                    " $val[0] " . ($val[0] == 'PRIMARY' ? 'KEY ' : '') . '(' . implode(', ', $val[2]) . ')'
-                );
-            } elseif ($val[2] == 'DROP') {
-                $drop[] = $this->driver->escapeId($val[1]);
+        $columns = [];
+        foreach (array_reverse($drop) as $index) {
+            if ($index->type === 'INDEX') {
+                $queries[] = 'DROP INDEX ' . $this->driver->escapeId($index);
             } else {
-                $queries[] = 'CREATE INDEX ' . $this->driver->escapeId($val[1] != '' ? $val[1] : uniqid($table . '_')) .
-                    ' ON ' . $this->driver->table($table) . ' (' . implode(', ', $val[2]) . ')';
+                $columns[] = 'DROP CONSTRAINT ' . $this->driver->escapeId($index->name);
             }
         }
-        if ($create) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) . implode(',', $create));
+        foreach ($alter as $index) {
+            if ($index->type === 'INDEX') {
+                $queries[] = 'CREATE INDEX ' .
+                    $this->driver->escapeId($index->name != '' ? $index->name : uniqid($table . '_')) .
+                    ' ON ' . $this->driver->table($table) . ' (' . implode(', ', $index->columns) . ')';
+            } else {
+                //! descending UNIQUE indexes results in syntax error
+                $constraint = ($index->name != '' ? ' CONSTRAINT ' . $this->driver->escapeId($index->name) : '');
+                $columns[] = "ADD$constraint " . ($index->type == 'PRIMARY' ? 'PRIMARY KEY' : $index->type) .
+                    ' (' . implode(', ', $index->columns) . ')';
+            }
         }
-        if ($drop) {
-            array_unshift($queries, 'DROP INDEX ' . implode(', ', $drop));
+        if (!empty($columns)) {
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) . implode(', ', $columns));
         }
         foreach ($queries as $query) {
-            if (!$this->driver->execute($query)) {
-                return false;
-            }
+            $this->driver->execute($query);
         }
         return true;
     }
