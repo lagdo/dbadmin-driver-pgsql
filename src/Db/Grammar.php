@@ -4,6 +4,8 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\Grammar as AbstractGrammar;
 
+use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+
 class Grammar extends AbstractGrammar
 {
     /**
@@ -52,36 +54,17 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @inheritDoc
+     * @param array $fields
+     * @param boolean $autoIncrement
+     * @param string $style
+     *
+     * @return array
      */
-    public function sqlForCreateTable(string $table, bool $autoIncrement, string $style)
+    private function _sequences(array $fields, bool $autoIncrement, string $style)
     {
-        $clauses = [];
         $sequences = [];
-
-        $status = $this->driver->tableStatus($table);
-        if ($status !== null && $this->driver->isView($status)) {
-            $view = $this->driver->view($table);
-            return rtrim("CREATE VIEW " . $this->escapeId($table) . " AS $view[select]", ";");
-        }
-        $fields = $this->driver->fields($table);
-        $indexes = $this->driver->indexes($table);
-        ksort($indexes);
-        $constraints = $this->constraints($table);
-
-        if (empty($status) || empty($fields)) {
-            return '';
-        }
-
-        $query = "CREATE TABLE " . $this->escapeId($status->schema) . "." .
-            $this->escapeId($status->name) . " (\n    ";
-
-        // fields' definitions
+        // Fields definitions
         foreach ($fields as $field_name => $field) {
-            $part = $this->escapeId($field->name) . ' ' . $field->fullType .
-                $this->driver->defaultValue($field) . ($field->attnotnull ? " NOT NULL" : "");
-            $clauses[] = $part;
-
             // sequences for fields
             if (preg_match('~nextval\(\'([^\']+)\'\)~', $field->default, $matches)) {
                 $sequence_name = $matches[1];
@@ -94,13 +77,24 @@ class Grammar extends AbstractGrammar
                     ($autoIncrement && $sq['last_value'] ? " START $sq[last_value]" : "") . " CACHE $sq[cache_value];";
             }
         }
+        return $sequences;
+    }
 
-        // adding sequences before table definition
-        if (!empty($sequences)) {
-            $query = implode("\n\n", $sequences) . "\n\n$query";
+    /**
+     * @param array $fields
+     * @param array $indexes
+     *
+     * @return array
+     */
+    private function _clauses(array $fields, array $indexes)
+    {
+        $clauses = [];
+        // Fields definitions
+        foreach ($fields as $field_name => $field) {
+            $clauses[] = $this->escapeId($field->name) . ' ' . $field->fullType .
+                $this->driver->defaultValue($field) . ($field->attnotnull ? " NOT NULL" : "");
         }
-
-        // primary + unique keys
+        // Primary + unique keys
         foreach ($indexes as $index_name => $index) {
             switch ($index->type) {
                 case 'UNIQUE':
@@ -117,14 +111,24 @@ class Grammar extends AbstractGrammar
                     break;
             }
         }
-
+        // Constraints
+        $constraints = $this->constraints($table);
         foreach ($constraints as $conname => $consrc) {
             $clauses[] = "CONSTRAINT " . $this->escapeId($conname) . " CHECK $consrc";
         }
 
-        $query .= implode(",\n    ", $clauses) . "\n) WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
+        return $clauses;
+    }
 
-        // "basic" indexes after table definition
+    /**
+     * @param array $indexes
+     *
+     * @return string
+     */
+    private function _indexQueries(array $indexes)
+    {
+        $query = '';
+        // Indexes after table definition
         foreach ($indexes as $index_name => $index) {
             if ($index->type == 'INDEX') {
                 $columns = [];
@@ -136,20 +140,61 @@ class Grammar extends AbstractGrammar
                     " USING btree (" . implode(', ', $columns) . ");";
             }
         }
+        return $query;
+    }
 
-        // coments for table & fields
+    /**
+     * @param array $fields
+     * @param TableEntity $status
+     *
+     * @return string
+     */
+    private function _commentQueries(array $fields, TableEntity $status)
+    {
+        $query = '';
+        $table = $this->escapeId($status->schema) . '.' . $this->escapeId($status->name);
+        // Comments for table & fields
         if ($status->comment) {
-            $query .= "\n\nCOMMENT ON TABLE " . $this->escapeId($status->schema) . "." .
-                $this->escapeId($status->name) . " IS " . $this->driver->quote($status->comment) . ";";
+            $query .= "\n\nCOMMENT ON TABLE $table IS " . $this->driver->quote($status->comment) . ";";
         }
-
-        foreach ($fields as $field_name => $field) {
+        foreach ($fields as $name => $field) {
             if ($field->comment) {
-                $query .= "\n\nCOMMENT ON COLUMN " . $this->escapeId($status->schema) . "." .
-                    $this->escapeId($status->name) . "." . $this->escapeId($field_name) .
+                $query .= "\n\nCOMMENT ON COLUMN $table." . $this->escapeId($name) .
                     " IS " . $this->driver->quote($field->comment) . ";";
             }
         }
+        return $query;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function sqlForCreateTable(string $table, bool $autoIncrement, string $style)
+    {
+        $status = $this->driver->tableStatus($table);
+        if ($status !== null && $this->driver->isView($status)) {
+            $view = $this->driver->view($table);
+            return rtrim("CREATE VIEW " . $this->escapeId($table) . " AS $view[select]", ";");
+        }
+
+        $fields = $this->driver->fields($table);
+        if (empty($status) || empty($fields)) {
+            return '';
+        }
+
+        $sequences = $this->_sequences($fields, $autoIncrement, $style);
+        $indexes = $this->driver->indexes($table);
+        ksort($indexes);
+        $clauses = $this->_clauses($fields, $indexes);
+        // Adding sequences before table definition
+        $query = '';
+        if (!empty($sequences)) {
+            $query = implode("\n\n", $sequences) . "\n\n";
+        }
+        $query .= 'CREATE TABLE ' . $this->escapeId($status->schema) . '.' . $this->escapeId($status->name) . " (\n    ";
+        $query .= implode(",\n    ", $clauses) . "\n) WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
+        $query .= $this->_indexQueries($indexes);
+        $query .= $this->_commentQueries($fields, $status);
 
         return rtrim($query, ';');
     }
