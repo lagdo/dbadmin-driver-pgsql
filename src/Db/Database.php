@@ -61,7 +61,6 @@ class Database extends AbstractDatabase
         $columns = [];
 
         foreach ($tableAttrs->fields as $field) {
-            $column = $this->driver->escapeId($field[0]);
             $val = $field[1];
             if (isset($val[6])) { // auto increment
                 $val[1] = ($val[1] == ' bigint' ? ' big' : ($val[1] == ' smallint' ? ' small' : ' ')) . 'serial';
@@ -87,7 +86,6 @@ class Database extends AbstractDatabase
         $columns = [];
 
         foreach ($tableAttrs->fields as $field) {
-            $column = $this->driver->escapeId($field[0]);
             $val = $field[1];
             if (isset($val[6])) { // auto increment
                 $val[1] = ($val[1] == ' bigint' ? ' big' : ($val[1] == ' smallint' ? ' small' : ' ')) . 'serial';
@@ -107,7 +105,7 @@ class Database extends AbstractDatabase
             }
         }
         foreach ($tableAttrs->dropped as $column) {
-            $columns[] = 'DROP ' . $this->driver->execute($column);
+            $columns[] = 'DROP ' . $this->driver->escapeId($column);
         }
 
         return $columns;
