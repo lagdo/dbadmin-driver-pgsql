@@ -81,12 +81,13 @@ class Grammar extends AbstractGrammar
     }
 
     /**
+     * @param string $table
      * @param array $fields
      * @param array $indexes
      *
      * @return array
      */
-    private function _clauses(array $fields, array $indexes)
+    private function _clauses(string $table, array $fields, array $indexes)
     {
         $clauses = [];
         // Fields definitions
@@ -122,10 +123,11 @@ class Grammar extends AbstractGrammar
 
     /**
      * @param array $indexes
+     * @param TableEntity $status
      *
      * @return string
      */
-    private function _indexQueries(array $indexes)
+    private function _indexQueries(array $indexes, TableEntity $status)
     {
         $query = '';
         // Indexes after table definition
@@ -185,7 +187,7 @@ class Grammar extends AbstractGrammar
         $sequences = $this->_sequences($fields, $autoIncrement, $style);
         $indexes = $this->driver->indexes($table);
         ksort($indexes);
-        $clauses = $this->_clauses($fields, $indexes);
+        $clauses = $this->_clauses($table, $fields, $indexes);
         // Adding sequences before table definition
         $query = '';
         if (!empty($sequences)) {
@@ -193,7 +195,7 @@ class Grammar extends AbstractGrammar
         }
         $query .= 'CREATE TABLE ' . $this->escapeId($status->schema) . '.' . $this->escapeId($status->name) . " (\n    ";
         $query .= implode(",\n    ", $clauses) . "\n) WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
-        $query .= $this->_indexQueries($indexes);
+        $query .= $this->_indexQueries($indexes, $status);
         $query .= $this->_commentQueries($fields, $status);
 
         return rtrim($query, ';');
