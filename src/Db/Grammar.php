@@ -233,4 +233,12 @@ class Grammar extends AbstractGrammar
     {
         return "\connect " . $this->escapeId($database);
     }
+
+    /**
+     * @inheritDoc
+     */
+    protected function queryRegex()
+    {
+        return '\\s*|[\'"]|/\*|-- |$|\$[^$]*\$';
+    }
 }
