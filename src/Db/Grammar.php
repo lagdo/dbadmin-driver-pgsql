@@ -68,10 +68,11 @@ class Grammar extends AbstractGrammar
             // sequences for fields
             if (preg_match('~nextval\(\'([^\']+)\'\)~', $field->default, $matches)) {
                 $sequence_name = $matches[1];
-                $sq = reset($this->driver->rows($this->driver->minVersion(10) ?
-                    "SELECT *, cache_size AS cache_value FROM pg_sequences " .
+                $rows = $this->driver->rows($this->driver->minVersion(10) ?
+                    ("SELECT *, cache_size AS cache_value FROM pg_sequences " .
                     "WHERE schemaname = current_schema() AND sequencename = " .
-                    $this->driver->quote($sequence_name) : "SELECT * FROM $sequence_name"));
+                    $this->driver->quote($sequence_name)) : "SELECT * FROM $sequence_name");
+                $sq = reset($rows);
                 $sequences[] = ($style == "DROP+CREATE" ? "DROP SEQUENCE IF EXISTS $sequence_name;\n" : "") .
                     "CREATE SEQUENCE $sequence_name INCREMENT $sq[increment_by] MINVALUE $sq[min_value] MAXVALUE $sq[max_value]" .
                     ($autoIncrement && $sq['last_value'] ? " START $sq[last_value]" : "") . " CACHE $sq[cache_value];";
