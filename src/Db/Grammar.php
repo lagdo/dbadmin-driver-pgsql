@@ -91,25 +91,22 @@ class Grammar extends AbstractGrammar
     private function _clauses(string $table, array $fields, array $indexes)
     {
         $clauses = [];
+        $escape = function($column) { return $this->escapeId($column); };
         // Fields definitions
         foreach ($fields as $field_name => $field) {
             $clauses[] = $this->escapeId($field->name) . ' ' . $field->fullType .
-                $this->driver->defaultValue($field) . ($field->attnotnull ? " NOT NULL" : "");
+                $this->driver->defaultValue($field) . ($field->null ? "" : " NOT NULL");
         }
         // Primary + unique keys
         foreach ($indexes as $index_name => $index) {
             switch ($index->type) {
                 case 'UNIQUE':
                     $clauses[] = "CONSTRAINT " . $this->escapeId($index_name) .
-                        " UNIQUE (" . implode(', ', array_map(function ($column) {
-                            return $this->escapeId($column);
-                        }, $index->columns)) . ")";
+                        " UNIQUE (" . implode(', ', array_map($escape, $index->columns)) . ")";
                     break;
                 case 'PRIMARY':
                     $clauses[] = "CONSTRAINT " . $this->escapeId($index_name) .
-                        " PRIMARY KEY (" . implode(', ', array_map(function ($column) {
-                            return $this->escapeId($column);
-                        }, $index->columns)) . ")";
+                        " PRIMARY KEY (" . implode(', ', array_map($escape, $index->columns)) . ")";
                     break;
             }
         }
