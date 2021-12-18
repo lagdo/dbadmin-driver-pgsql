@@ -136,7 +136,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function multiQuery($query)
+    public function multiQuery(string $query)
     {
         $this->statement = $this->query($query);
         return $this->statement !== false;
