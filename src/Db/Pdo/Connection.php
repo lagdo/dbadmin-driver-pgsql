@@ -10,8 +10,6 @@ use Lagdo\DbAdmin\Driver\Db\Pdo\Connection as PdoConnection;
 class Connection extends PdoConnection
 {
     /**
-     * Undocumented variable
-     *
      * @var int
      */
     public $timeout;
