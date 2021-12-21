@@ -20,15 +20,6 @@ class Connection extends AbstractConnection
      */
     public $timeout;
 
-    public function _error($errno, $error)
-    {
-        if ($this->util->iniBool("html_errors")) {
-            $error = html_entity_decode(strip_tags($error));
-        }
-        $error = preg_replace('~^[^:]*: ~', '', $error);
-        $this->driver->setError($error);
-    }
-
     /**
      * @inheritDoc
      */
@@ -40,7 +31,6 @@ class Connection extends AbstractConnection
         $password = addcslashes($options['password'], "'\\");
         $database = ($database) ? addcslashes($database, "'\\") : "postgres";
 
-        set_error_handler(array($this, '_error'));
         $connString = "host='$server' user='$username' password='$password' dbname='$database'";
         $this->client = pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
         // if (!$this->client && $database != "") {
@@ -48,9 +38,9 @@ class Connection extends AbstractConnection
         //     $this->_database = false;
         //     $this->client = pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
         // }
-        restore_error_handler();
 
         if (!$this->client) {
+            $this->driver->setError($this->trans->lang('Unable to connect to database server.'));
             return false;
         }
 

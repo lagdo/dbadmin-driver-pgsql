@@ -175,6 +175,6 @@ class Driver extends AbstractDriver
             $message = $match[1] . preg_replace('~((?:[^&]|&[^;]*;){' .
                 strlen($match[3]) . '})(.*)~', '\1<b>\2</b>', $match[2]) . $match[4];
         }
-        return $this->util->convertEolToHtml($message);
+        return $message;
     }
 }
