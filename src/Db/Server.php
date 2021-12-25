@@ -11,8 +11,8 @@ class Server extends AbstractServer
      */
     public function databases(bool $flush)
     {
-        return $this->driver->values("SELECT datname FROM pg_database WHERE " .
-            "has_database_privilege(datname, 'CONNECT') ORDER BY datname");
+        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') ORDER BY datname";
+        return $this->driver->values($query);
     }
 
     /**
@@ -115,7 +115,7 @@ class Server extends AbstractServer
     public function processAttr(array $process, string $key, string $val): string
     {
         if ($key == "current_query" && $val != "<IDLE>") {
-            return '<code>' . $this->shortenUtf8($val, 50) . '</code>' . $this->lang('Clone');
+            return '<code>' . $this->util->shortenUtf8($val, 50) . '</code>' . $this->trans->lang('Clone');
         }
         return parent::processAttr($process, $key, $val);
     }
