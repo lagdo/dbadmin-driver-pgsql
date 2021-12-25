@@ -2,8 +2,6 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
-
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 
 class Server extends AbstractServer
@@ -114,6 +112,17 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
+    public function processAttr(array $process, string $key, string $val): string
+    {
+        if ($key == "current_query" && $val != "<IDLE>") {
+            return '<code>' . $this->shortenUtf8($val, 50) . '</code>' . $this->lang('Clone');
+        }
+        return parent::processAttr($process, $key, $val);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function statusVariables()
     {
     }
@@ -121,24 +130,24 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function killProcess($val)
-    {
-        return $this->driver->execute("SELECT pg_terminate_backend(" . $this->util->number($val) . ")");
-    }
+    // public function killProcess($val)
+    // {
+    //     return $this->driver->execute("SELECT pg_terminate_backend(" . $this->util->number($val) . ")");
+    // }
 
     /**
      * @inheritDoc
      */
-    public function connectionId()
-    {
-        return "SELECT pg_backend_pid()";
-    }
+    // public function connectionId()
+    // {
+    //     return "SELECT pg_backend_pid()";
+    // }
 
     /**
      * @inheritDoc
      */
-    public function maxConnections()
-    {
-        return $this->connection->result("SHOW max_connections");
-    }
+    // public function maxConnections()
+    // {
+    //     return $this->connection->result("SHOW max_connections");
+    // }
 }
