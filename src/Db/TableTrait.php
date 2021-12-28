@@ -59,7 +59,7 @@ trait TableTrait
     private function primaryKeyColumns(string $table)
     {
         $indexes = [];
-        $table_oid = $this->connection->result("SELECT oid FROM pg_class WHERE " .
+        $table_oid = $this->driver->result("SELECT oid FROM pg_class WHERE " .
             "relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()) " .
             "AND relname = " . $this->driver->quote($table));
         $columns = $this->driver->keyValues("SELECT attnum, attname FROM pg_attribute WHERE " .

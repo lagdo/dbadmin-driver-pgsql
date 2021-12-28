@@ -4,6 +4,8 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 
+use function in_array;
+
 class Server extends AbstractServer
 {
     /**
@@ -20,7 +22,7 @@ class Server extends AbstractServer
      */
     public function databaseSize(string $database)
     {
-        $statement = $this->connection->query("SELECT pg_database_size(" . $this->driver->quote($database) . ")");
+        $statement = $this->driver->execute("SELECT pg_database_size(" . $this->driver->quote($database) . ")");
         if (is_object($statement) && ($row = $statement->fetchRow())) {
             return intval($row[0]);
         }
@@ -32,7 +34,7 @@ class Server extends AbstractServer
      */
     public function databaseCollation(string $database, array $collations)
     {
-        return $this->connection->result("SELECT datcollate FROM pg_database WHERE datname = " . $this->driver->quote($database));
+        return $this->driver->result("SELECT datcollate FROM pg_database WHERE datname = " . $this->driver->quote($database));
     }
 
     /**
@@ -67,7 +69,10 @@ class Server extends AbstractServer
      */
     public function dropDatabases(array $databases)
     {
-        $this->connection->close();
+        // Cannot drop the connected database.
+        if (in_array($this->driver->database(), $databases)) {
+            return false;
+        }
         return $this->driver->applyQueries("DROP DATABASE", $databases, function($database) {
             return $this->driver->escapeId($database);
         });
@@ -148,6 +153,6 @@ class Server extends AbstractServer
      */
     // public function maxConnections()
     // {
-    //     return $this->connection->result("SHOW max_connections");
+    //     return $this->driver->result("SHOW max_connections");
     // }
 }

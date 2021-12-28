@@ -76,7 +76,7 @@ class Query extends AbstractQuery
     {
         $query = "EXPLAIN SELECT * FROM " . $this->driver->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");
-        if (preg_match("~ rows=([0-9]+)~", $this->connection->result($query), $regs))
+        if (preg_match("~ rows=([0-9]+)~", $this->driver->result($query), $regs))
         {
             return $regs[1];
         }
@@ -94,8 +94,8 @@ class Query extends AbstractQuery
             'name' => $name,
             'type' => $type,
             'materialized' => ($type != 'VIEW'),
-            'select' => trim($this->connection->result("SELECT pg_get_viewdef(" .
-                $this->connection->result("SELECT oid FROM pg_class WHERE relnamespace = " .
+            'select' => trim($this->driver->result("SELECT pg_get_viewdef(" .
+                $this->driver->result("SELECT oid FROM pg_class WHERE relnamespace = " .
                 "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = " .
                 $this->driver->quote($name)) . ")"))
         ];
@@ -107,7 +107,7 @@ class Query extends AbstractQuery
     public function slowQuery(string $query, int $timeout)
     {
         // $this->connection->timeout = 1000 * $timeout;
-        $this->connection->query("SET statement_timeout = " . (1000 * $timeout));
+        $this->driver->execute("SET statement_timeout = " . (1000 * $timeout));
         return $query;
     }
 
@@ -124,7 +124,7 @@ class Query extends AbstractQuery
      */
     public function user()
     {
-        return $this->connection->result("SELECT user");
+        return $this->driver->result("SELECT user");
     }
 
     /**
@@ -132,6 +132,6 @@ class Query extends AbstractQuery
      */
     public function schema()
     {
-        return $this->connection->result("SELECT current_schema()");
+        return $this->driver->result("SELECT current_schema()");
     }
 }

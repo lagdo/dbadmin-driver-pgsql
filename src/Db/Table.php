@@ -123,21 +123,18 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function indexes(string $table, ConnectionInterface $connection = null)
+    public function indexes(string $table)
     {
-        if (!$connection) {
-            $connection = $this->connection;
-        }
         $indexes = [];
-        $table_oid = $connection->result("SELECT oid FROM pg_class WHERE " .
+        $table_oid = $this->driver->result("SELECT oid FROM pg_class WHERE " .
             "relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()) " .
             "AND relname = " . $this->driver->quote($table));
         $columns = $this->driver->keyValues("SELECT attnum, attname FROM pg_attribute WHERE " .
-            "attrelid = $table_oid AND attnum > 0", $connection);
+            "attrelid = $table_oid AND attnum > 0");
         $query = "SELECT relname, indisunique::int, indisprimary::int, indkey, indoption, " .
             "(indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
             "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid";
-        foreach ($this->driver->rows($query, $connection) as $row)
+        foreach ($this->driver->rows($query) as $row)
         {
             $indexes[$row["relname"]] = $this->makeIndexEntity($row, $columns);
         }

@@ -102,11 +102,11 @@ class Driver extends AbstractDriver
 
         if ($this->connection === null) {
             $this->connection = $connection;
-            $this->server = new Db\Server($this, $this->util, $this->trans, $connection);
-            $this->database = new Db\Database($this, $this->util, $this->trans, $connection);
-            $this->table = new Db\Table($this, $this->util, $this->trans, $connection);
-            $this->query = new Db\Query($this, $this->util, $this->trans, $connection);
-            $this->grammar = new Db\Grammar($this, $this->util, $this->trans, $connection);
+            $this->server = new Db\Server($this, $this->util, $this->trans);
+            $this->database = new Db\Database($this, $this->util, $this->trans);
+            $this->table = new Db\Table($this, $this->util, $this->trans);
+            $this->query = new Db\Query($this, $this->util, $this->trans);
+            $this->grammar = new Db\Grammar($this, $this->util, $this->trans);
         }
 
         return $connection;
