@@ -4,6 +4,9 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 
+use Lagdo\DbAdmin\Driver\Db\StatementInterface;
+
+use function is_a;
 use function in_array;
 
 class Server extends AbstractServer
@@ -23,7 +26,7 @@ class Server extends AbstractServer
     public function databaseSize(string $database)
     {
         $statement = $this->driver->execute("SELECT pg_database_size(" . $this->driver->quote($database) . ")");
-        if (is_object($statement) && ($row = $statement->fetchRow())) {
+        if (is_a($statement, StatementInterface::class) && ($row = $statement->fetchRow())) {
             return intval($row[0]);
         }
         return 0;
