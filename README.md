@@ -1,5 +1,7 @@
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/lagdo/dbadmin-driver-pgsql/badges/quality-score.png?b=main)](https://scrutinizer-ci.com/g/lagdo/dbadmin-driver-pgsql/?branch=main)
 [![StyleCI](https://styleci.io/repos/400390231/shield?branch=main)](https://styleci.io/repos/400390231)
+[![Build Status](https://api.travis-ci.com/lagdo/dbadmin-driver-pgsql.svg?branch=main)](https://app.travis-ci.com/github/lagdo/dbadmin-driver-pgsql)
+[![Coverage Status](https://coveralls.io/repos/github/lagdo/dbadmin-driver-pgsql/badge.svg?branch=main)](https://coveralls.io/github/lagdo/dbadmin-driver-pgsql?branch=main)
 
 [![Latest Stable Version](https://poser.pugx.org/lagdo/dbadmin-driver-pgsql/v/stable)](https://packagist.org/packages/lagdo/dbadmin-driver-pgsql)
 [![Total Downloads](https://poser.pugx.org/lagdo/dbadmin-driver-pgsql/downloads)](https://packagist.org/packages/lagdo/dbadmin-driver-pgsql)
