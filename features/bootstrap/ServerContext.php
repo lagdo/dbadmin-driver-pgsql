@@ -5,9 +5,7 @@ use Lagdo\DbAdmin\Driver\PgSql\Tests\Driver;
 use Behat\Behat\Context\Context;
 use PHPUnit\Framework\Assert;
 
-use function count;
-
-class FeatureContext implements Context
+class ServerContext implements Context
 {
     /**
      * @var Driver
