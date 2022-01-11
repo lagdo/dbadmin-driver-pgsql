@@ -4,6 +4,7 @@ namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
+use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;
 
 class Driver extends AbstractDriver
 {
@@ -85,21 +86,14 @@ class Driver extends AbstractDriver
     }
 
     /**
-     * @inheritDoc
-     * @throws AuthException
+     * Initialize a new connection
+     *
+     * @param AbstractConnection $connection
+     *
+     * @return AbstractConnection
      */
-    public function createConnection()
+    private function initConnection(AbstractConnection $connection)
     {
-        if (extension_loaded("pgsql")) {
-            $connection = new Db\PgSql\Connection($this, $this->util, $this->trans, 'PgSQL');
-        }
-        elseif (extension_loaded("pdo_pgsql")) {
-            $connection = new Db\Pdo\Connection($this, $this->util, $this->trans, 'PDO_PgSQL');
-        }
-        else {
-            throw new AuthException($this->trans->lang('No package installed to connect to a PostgreSQL server.'));
-        }
-
         if ($this->connection === null) {
             $this->connection = $connection;
             $this->server = new Db\Server($this, $this->util, $this->trans);
@@ -108,8 +102,24 @@ class Driver extends AbstractDriver
             $this->query = new Db\Query($this, $this->util, $this->trans);
             $this->grammar = new Db\Grammar($this, $this->util, $this->trans);
         }
-
         return $connection;
+    }
+
+    /**
+     * @inheritDoc
+     * @throws AuthException
+     */
+    public function createConnection()
+    {
+        if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
+            $connection = new Db\PgSql\Connection($this, $this->util, $this->trans, 'PgSQL');
+            return $this->initConnection($connection);
+        }
+        if (extension_loaded("pdo_pgsql")) {
+            $connection = new Db\Pdo\Connection($this, $this->util, $this->trans, 'PDO_PgSQL');
+            return $this->initConnection($connection);
+        }
+        throw new AuthException($this->trans->lang('No package installed to connect to a PostgreSQL server.'));
     }
 
     /**
