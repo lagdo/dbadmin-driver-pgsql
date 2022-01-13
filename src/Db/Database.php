@@ -12,6 +12,13 @@ class Database extends AbstractDatabase
     use DatabaseTrait;
 
     /**
+     * PostgreSQL system schemas
+     *
+     * @var array
+     */
+    protected $systemSchemas = ['information_schema', 'pg_catalog', 'pg_temp_1', 'pg_toast', 'pg_toast_temp_1'];
+
+    /**
      * @inheritDoc
      */
     public function createTable(TableEntity $tableAttrs)
@@ -117,9 +124,8 @@ class Database extends AbstractDatabase
     {
         $connection = $this->driver->createConnection(); // New connection
         $counts = [];
-        $systemSchemas = ['information_schema', 'pg_catalog', 'pg_temp_1', 'pg_toast', 'pg_toast_temp_1'];
         $query = "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('" .
-            implode("','", $systemSchemas) . "')";
+            implode("','", $this->systemSchemas) . "')";
         foreach ($databases as $database) {
             $counts[$database] = 0;
             if (!$connection->open($database)) {
@@ -160,7 +166,9 @@ class Database extends AbstractDatabase
      */
     public function schemas()
     {
-        return $this->driver->values('SELECT nspname FROM pg_namespace ORDER BY nspname');
+        $query = "SELECT nspname FROM pg_namespace WHERE nspname NOT IN ('" .
+            implode("','", $this->systemSchemas) . "') ORDER BY nspname";
+        return $this->driver->values($query);
     }
 
     /**

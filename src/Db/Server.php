@@ -16,7 +16,8 @@ class Server extends AbstractServer
      */
     public function databases(bool $flush)
     {
-        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') ORDER BY datname";
+        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
+            "AND datname not in ('postgres','template0','template1') ORDER BY datname";
         return $this->driver->values($query);
     }
 
