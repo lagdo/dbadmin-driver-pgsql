@@ -71,15 +71,14 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function dropDatabases(array $databases)
+    public function dropDatabase(string $database)
     {
         // Cannot drop the connected database.
-        if (in_array($this->driver->database(), $databases)) {
+        if ($this->driver->database() === $database) {
             return false;
         }
-        return $this->driver->applyQueries("DROP DATABASE", $databases, function($database) {
-            return $this->driver->escapeId($database);
-        });
+        $result = $this->driver->execute('DROP DATABASE ' . $this->driver->escapeId($database));
+        return $result !== false;
     }
 
     /**
