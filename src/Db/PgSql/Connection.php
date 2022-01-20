@@ -45,7 +45,7 @@ class Connection extends AbstractConnection
         }
 
         if ($this->driver->minVersion(9, 0)) {
-            if (pg_query($this->client, "SET application_name = 'Adminer'") === false) {
+            if (pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
                 $this->driver->setError(pg_last_error($this->client));
             }
         }

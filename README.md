@@ -12,7 +12,7 @@ DbAdmin drivers for PostgreSQL
 
 This package is based on [Adminer](https://github.com/vrana/adminer).
 
-It provides PostgreSQL drivers for [Jaxon Adminer](https://github.com/lagdo/jaxon-dbadmin), and implements the interfaces defined in [https://github.com/lagdo/dbadmin-driver](https://github.com/lagdo/dbadmin-driver).
+It provides PostgreSQL drivers for [Jaxon DbAdmin](https://github.com/lagdo/jaxon-dbadmin), and implements the interfaces defined in [https://github.com/lagdo/dbadmin-driver](https://github.com/lagdo/dbadmin-driver).
 
 It requires either the `php-pgsql` or the `php-pdo_pgsql` PHP extension to be installed, and uses the former by default.
 
@@ -47,4 +47,4 @@ Declare the PostgreSQL servers in the `packages` section on the `Jaxon` config f
     ],
 ```
 
-Check the [Jaxon Adminer](https://github.com/lagdo/jaxon-dbadmin) documentation for more information about the package usage.
+Check the [Jaxon DbAdmin](https://github.com/lagdo/jaxon-dbadmin) documentation for more information about the package usage.

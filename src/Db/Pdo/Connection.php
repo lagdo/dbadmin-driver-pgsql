@@ -31,7 +31,7 @@ class Connection extends PdoConnection
         //! client_encoding is supported since 9.1 but we can't yet use min_version here
         $this->dsn("pgsql:host='$server' client_encoding=utf8 dbname='$database'", $username, $password);
         if ($this->driver->minVersion(9, 0)) {
-            $this->query("SET application_name = 'Adminer'");
+            $this->query("SET application_name = 'Jaxon DbAdmin'");
         }
         if (($schema)) {
             $this->query("SET search_path TO " . $this->driver->escapeId($schema));
