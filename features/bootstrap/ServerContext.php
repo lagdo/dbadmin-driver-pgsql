@@ -48,7 +48,8 @@ class ServerContext implements Context
     {
         $queries = $this->driver->queries();
         Assert::assertGreaterThan(0, count($queries));
-        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') ORDER BY datname";
+        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
+            "AND datname not in ('postgres','template0','template1') ORDER BY datname";
         Assert::assertEquals($queries[0]['query'], $query);
     }
 
