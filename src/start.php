@@ -1,7 +1,7 @@
 <?php
 
-if (function_exists('jaxon')) {
-    $di = jaxon()->di();
+if (function_exists('Jaxon\jaxon')) {
+    $di = Jaxon\jaxon()->di();
     // Register the database classes in the dependency container
     $di->set(Lagdo\DbAdmin\Driver\PgSql\Driver::class, function($di) {
         $util = $di->get(Lagdo\DbAdmin\Driver\UtilInterface::class);
