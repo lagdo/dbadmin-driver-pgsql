@@ -7,7 +7,7 @@ use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 
 use function is_a;
-use function in_array;
+use function intval;
 
 class Server extends AbstractServer
 {
