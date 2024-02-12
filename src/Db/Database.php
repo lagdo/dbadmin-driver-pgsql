@@ -122,13 +122,13 @@ class Database extends AbstractDatabase
      */
     public function countTables(array $databases)
     {
-        $connection = $this->driver->createConnection(); // New connection
         $counts = [];
         $query = "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('" .
             implode("','", $this->systemSchemas) . "')";
         foreach ($databases as $database) {
             $counts[$database] = 0;
-            if (!$connection->open($database)) {
+            $connection = $this->driver->connect($database); // New connection
+            if (!$connection) {
                 continue;
             }
             $statement = $connection->query($query);

@@ -4,13 +4,41 @@ namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
+use Lagdo\DbAdmin\Driver\TranslatorInterface;
+use Lagdo\DbAdmin\Driver\UtilInterface;
 
 class Driver extends AbstractDriver
 {
     /**
+     * The constructor
+     *
+     * @param UtilInterface $util
+     * @param TranslatorInterface $trans
+     * @param array $options
+     */
+    public function __construct(UtilInterface $util, TranslatorInterface $trans, array $options)
+    {
+        parent::__construct($util, $trans, $options);
+
+        $this->server = new Db\Server($this, $this->util, $this->trans);
+        $this->database = new Db\Database($this, $this->util, $this->trans);
+        $this->table = new Db\Table($this, $this->util, $this->trans);
+        $this->query = new Db\Query($this, $this->util, $this->trans);
+        $this->grammar = new Db\Grammar($this, $this->util, $this->trans);
+    }
+
+    /**
      * @inheritDoc
      */
-    protected function initDriver()
+    public function name()
+    {
+        return "PostgreSQL";
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function initConfig()
     {
         // Init config
         $this->config->jush = 'pgsql';
@@ -42,46 +70,13 @@ class Driver extends AbstractDriver
         $this->config->features = ['database', 'table', 'columns', 'sql', 'indexes', 'descidx',
             'comment', 'view', 'scheme', 'routine', 'processlist', 'sequence', 'trigger',
             'type', 'variables', 'drop_col', 'kill', 'dump', 'fkeys_sql'];
-
-        $this->server = new Db\Server($this, $this->util, $this->trans);
-        $this->database = new Db\Database($this, $this->util, $this->trans);
-        $this->table = new Db\Table($this, $this->util, $this->trans);
-        $this->query = new Db\Query($this, $this->util, $this->trans);
-        $this->grammar = new Db\Grammar($this, $this->util, $this->trans);
     }
 
     /**
      * @inheritDoc
      */
-    public function name()
+    protected function postConnectConfig()
     {
-        return "PostgreSQL";
-    }
-
-    /**
-     * @inheritDoc
-     * @throws AuthException
-     */
-    public function createConnection()
-    {
-        if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
-            $connection = new Db\PgSql\Connection($this, $this->util, $this->trans, 'PgSQL');
-            return $this->connection = $connection;
-        }
-        if (extension_loaded("pdo_pgsql")) {
-            $connection = new Db\Pdo\Connection($this, $this->util, $this->trans, 'PDO_PgSQL');
-            return $this->connection = $connection;
-        }
-        throw new AuthException($this->trans->lang('No package installed to connect to a PostgreSQL server.'));
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function connect(string $database, string $schema)
-    {
-        parent::connect($database, $schema);
-
         if ($this->minVersion(9.3)) {
             $this->config->features[] = 'materializedview';
         }
@@ -99,6 +94,23 @@ class Driver extends AbstractDriver
                 $this->config->structuredTypes[$this->trans->lang('User types')][] = $type;
             }
         }
+    }
+
+    /**
+     * @inheritDoc
+     * @throws AuthException
+     */
+    protected function createConnection()
+    {
+        if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
+            $connection = new Db\PgSql\Connection($this, $this->util, $this->trans, 'PgSQL');
+            return $this->connection = $connection;
+        }
+        if (extension_loaded("pdo_pgsql")) {
+            $connection = new Db\Pdo\Connection($this, $this->util, $this->trans, 'PDO_PgSQL');
+            return $this->connection = $connection;
+        }
+        throw new AuthException($this->trans->lang('No package installed to connect to a PostgreSQL server.'));
     }
 
     /**
