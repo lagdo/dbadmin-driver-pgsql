@@ -1,0 +1,41 @@
+{
+    "name": "lagdo/dbadmin-driver-pgsql",
+    "type": "library",
+    "description": "DbAdmin driver for PostgreSQL.",
+    "authors": [
+        {
+            "name": "Thierry Feuzeu",
+            "email": "thierry.feuzeu@gmail.com"
+        }
+    ],
+    "homepage": "https://github.com/lagdo/dbadmin-driver-pgsql",
+    "license": "Apache-2.0",
+    "keywords": ["Adminer", "Database", "Admin", "Dashboard", "Sql", "PostgreSQL"],
+    "support": {
+        "issues": "https://github.com/lagdo/dbadmin-driver-pgsql/issues",
+        "source": "https://github.com/lagdo/dbadmin-driver-pgsql"
+    },
+    "require": {
+        "lagdo/dbadmin-driver": "^0.11"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "behat/behat": "^3.10",
+        "dvdoug/behat-code-coverage": "5.0.*",
+        "php-coveralls/php-coveralls": "^2.5",
+        "phpunit/phpcov": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Lagdo\\DbAdmin\\Driver\\PgSql\\": "src/"
+        },
+        "files": [
+            "src/start.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Lagdo\\DbAdmin\\Driver\\PgSql\\Tests\\": "tests/"
+        }
+    }
+}
