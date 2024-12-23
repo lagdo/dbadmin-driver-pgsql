@@ -6,7 +6,7 @@ use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
 use Lagdo\DbAdmin\Driver\Input;
 use Lagdo\DbAdmin\Driver\Fake\DriverTrait;
 use Lagdo\DbAdmin\Driver\Fake\Translator;
-use Lagdo\DbAdmin\Driver\Fake\Util;
+use Lagdo\DbAdmin\Driver\Fake\Admin;
 use Lagdo\DbAdmin\Driver\Fake\Connection;
 
 use Lagdo\DbAdmin\Driver\PgSql\Driver as PgSqlDriver;
@@ -27,8 +27,8 @@ class Driver extends PgSqlDriver
     {
         $input = new Input();
         $trans = new Translator();
-        $util = new Util($trans, $input);
-        parent::__construct($util, $trans, []);
+        $admin = new Admin($trans, $input);
+        parent::__construct($admin, $trans, []);
     }
 
     /**
@@ -36,13 +36,13 @@ class Driver extends PgSqlDriver
      */
     protected function createConnection()
     {
-        $this->testConnection = new Connection($this, $this->util, $this->trans, 'test');
+        $this->testConnection = new Connection($this, $this->admin, $this->trans, 'test');
         $this->connection = $this->testConnection;
-        $this->server = new Server($this, $this->util, $this->trans);
-        $this->database = new Database($this, $this->util, $this->trans);
-        $this->table = new Table($this, $this->util, $this->trans);
-        $this->query = new Query($this, $this->util, $this->trans);
-        $this->grammar = new Grammar($this, $this->util, $this->trans);
+        $this->server = new Server($this, $this->admin, $this->trans);
+        $this->database = new Database($this, $this->admin, $this->trans);
+        $this->table = new Table($this, $this->admin, $this->trans);
+        $this->query = new Query($this, $this->admin, $this->trans);
+        $this->grammar = new Grammar($this, $this->admin, $this->trans);
 
         return $this->connection;
     }
@@ -50,7 +50,7 @@ class Driver extends PgSqlDriver
     /**
      * @inheritDoc
      */
-    public function connect(string $database, string $schema)
+    public function connect(string $database, string $schema = '')
     {
         AbstractDriver::connect($database, $schema);
     }

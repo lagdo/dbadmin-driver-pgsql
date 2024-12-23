@@ -172,6 +172,6 @@ class Connection extends AbstractConnection
     public function warnings()
     {
         // second parameter is available since PHP 7.1.0
-        return $this->util->html(pg_last_notice($this->client));
+        return $this->admin->html(pg_last_notice($this->client));
     }
 }

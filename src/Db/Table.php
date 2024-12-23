@@ -170,7 +170,7 @@ class Table extends AbstractTable
             return new TriggerEntity('', '', 'EXECUTE PROCEDURE ()');
         }
         if ($table === '') {
-            $table = $this->util->input()->getTable();
+            $table = $this->admin->input()->getTable();
         }
         $query = 'SELECT t.trigger_name AS "Trigger", t.action_timing AS "Timing", ' .
             '(SELECT STRING_AGG(event_manipulation, \' OR \') FROM information_schema.triggers ' .

@@ -5,26 +5,26 @@ namespace Lagdo\DbAdmin\Driver\PgSql;
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
 use Lagdo\DbAdmin\Driver\TranslatorInterface;
-use Lagdo\DbAdmin\Driver\UtilInterface;
+use Lagdo\DbAdmin\Driver\AdminInterface;
 
 class Driver extends AbstractDriver
 {
     /**
      * The constructor
      *
-     * @param UtilInterface $util
+     * @param AdminInterface $admin
      * @param TranslatorInterface $trans
      * @param array $options
      */
-    public function __construct(UtilInterface $util, TranslatorInterface $trans, array $options)
+    public function __construct(AdminInterface $admin, TranslatorInterface $trans, array $options)
     {
-        parent::__construct($util, $trans, $options);
+        parent::__construct($admin, $trans, $options);
 
-        $this->server = new Db\Server($this, $this->util, $this->trans);
-        $this->database = new Db\Database($this, $this->util, $this->trans);
-        $this->table = new Db\Table($this, $this->util, $this->trans);
-        $this->query = new Db\Query($this, $this->util, $this->trans);
-        $this->grammar = new Db\Grammar($this, $this->util, $this->trans);
+        $this->server = new Db\Server($this, $this->admin, $this->trans);
+        $this->database = new Db\Database($this, $this->admin, $this->trans);
+        $this->table = new Db\Table($this, $this->admin, $this->trans);
+        $this->query = new Db\Query($this, $this->admin, $this->trans);
+        $this->grammar = new Db\Grammar($this, $this->admin, $this->trans);
     }
 
     /**
@@ -103,11 +103,11 @@ class Driver extends AbstractDriver
     protected function createConnection()
     {
         if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
-            $connection = new Db\PgSql\Connection($this, $this->util, $this->trans, 'PgSQL');
+            $connection = new Db\PgSql\Connection($this, $this->admin, $this->trans, 'PgSQL');
             return $this->connection = $connection;
         }
         if (extension_loaded("pdo_pgsql")) {
-            $connection = new Db\Pdo\Connection($this, $this->util, $this->trans, 'PDO_PgSQL');
+            $connection = new Db\Pdo\Connection($this, $this->admin, $this->trans, 'PDO_PgSQL');
             return $this->connection = $connection;
         }
         throw new AuthException($this->trans->lang('No package installed to connect to a PostgreSQL server.'));
