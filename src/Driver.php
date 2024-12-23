@@ -38,7 +38,7 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function initConfig()
+    protected function beforeConnectConfig()
     {
         // Init config
         $this->config->jush = 'pgsql';
@@ -75,7 +75,7 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function postConnectConfig()
+    protected function afterConnectConfig()
     {
         if ($this->minVersion(9.3)) {
             $this->config->features[] = 'materializedview';
