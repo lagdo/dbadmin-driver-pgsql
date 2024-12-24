@@ -40,7 +40,7 @@ class Connection extends AbstractConnection
         // }
 
         if (!$this->client) {
-            $this->driver->setError($this->trans->lang('Unable to connect to database server.'));
+            $this->driver->setError($this->utils->trans->lang('Unable to connect to database server.'));
             return false;
         }
 
@@ -172,6 +172,6 @@ class Connection extends AbstractConnection
     public function warnings()
     {
         // second parameter is available since PHP 7.1.0
-        return $this->admin->html(pg_last_notice($this->client));
+        return $this->utils->str->html(pg_last_notice($this->client));
     }
 }

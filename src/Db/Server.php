@@ -123,7 +123,7 @@ class Server extends AbstractServer
     public function processAttr(array $process, string $key, string $val): string
     {
         if ($key == "current_query" && $val != "<IDLE>") {
-            return '<code>' . $this->admin->shortenUtf8($val, 50) . '</code>' . $this->trans->lang('Clone');
+            return '<code>' . $this->utils->str->shortenUtf8($val, 50) . '</code>' . $this->utils->trans->lang('Clone');
         }
         return parent::processAttr($process, $key, $val);
     }
@@ -140,7 +140,7 @@ class Server extends AbstractServer
      */
     // public function killProcess($val)
     // {
-    //     return $this->driver->execute("SELECT pg_terminate_backend(" . $this->admin->number($val) . ")");
+    //     return $this->driver->execute("SELECT pg_terminate_backend(" . $this->utils->str->number($val) . ")");
     // }
 
     /**

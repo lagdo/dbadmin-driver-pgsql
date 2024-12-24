@@ -3,28 +3,26 @@
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
+use Lagdo\DbAdmin\Driver\Utils\Utils;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
-use Lagdo\DbAdmin\Driver\TranslatorInterface;
-use Lagdo\DbAdmin\Driver\AdminInterface;
 
 class Driver extends AbstractDriver
 {
     /**
      * The constructor
      *
-     * @param AdminInterface $admin
-     * @param TranslatorInterface $trans
+     * @param Utils $utils
      * @param array $options
      */
-    public function __construct(AdminInterface $admin, TranslatorInterface $trans, array $options)
+    public function __construct(Utils $utils, array $options)
     {
-        parent::__construct($admin, $trans, $options);
+        parent::__construct($utils, $options);
 
-        $this->server = new Db\Server($this, $this->admin, $this->trans);
-        $this->database = new Db\Database($this, $this->admin, $this->trans);
-        $this->table = new Db\Table($this, $this->admin, $this->trans);
-        $this->query = new Db\Query($this, $this->admin, $this->trans);
-        $this->grammar = new Db\Grammar($this, $this->admin, $this->trans);
+        $this->server = new Db\Server($this, $this->utils);
+        $this->database = new Db\Database($this, $this->utils);
+        $this->table = new Db\Table($this, $this->utils);
+        $this->query = new Db\Query($this, $this->utils);
+        $this->grammar = new Db\Grammar($this, $this->utils);
     }
 
     /**
@@ -81,17 +79,17 @@ class Driver extends AbstractDriver
             $this->config->features[] = 'materializedview';
         }
         if ($this->minVersion(9.2)) {
-            $this->config->structuredTypes[$this->trans->lang('Strings')][] = "json";
+            $this->config->structuredTypes[$this->utils->trans->lang('Strings')][] = "json";
             $this->config->types["json"] = 4294967295;
             if ($this->minVersion(9.4)) {
-                $this->config->structuredTypes[$this->trans->lang('Strings')][] = "jsonb";
+                $this->config->structuredTypes[$this->utils->trans->lang('Strings')][] = "jsonb";
                 $this->config->types["jsonb"] = 4294967295;
             }
         }
         foreach ($this->userTypes() as $type) { //! get types from current_schemas('t')
             if (!isset($this->config->types[$type])) {
                 $this->config->types[$type] = 0;
-                $this->config->structuredTypes[$this->trans->lang('User types')][] = $type;
+                $this->config->structuredTypes[$this->utils->trans->lang('User types')][] = $type;
             }
         }
     }
@@ -103,14 +101,14 @@ class Driver extends AbstractDriver
     protected function createConnection()
     {
         if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
-            $connection = new Db\PgSql\Connection($this, $this->admin, $this->trans, 'PgSQL');
+            $connection = new Db\PgSql\Connection($this, $this->utils, 'PgSQL');
             return $this->connection = $connection;
         }
         if (extension_loaded("pdo_pgsql")) {
-            $connection = new Db\Pdo\Connection($this, $this->admin, $this->trans, 'PDO_PgSQL');
+            $connection = new Db\Pdo\Connection($this, $this->utils, 'PDO_PgSQL');
             return $this->connection = $connection;
         }
-        throw new AuthException($this->trans->lang('No package installed to connect to a PostgreSQL server.'));
+        throw new AuthException($this->utils->trans->lang('No package installed to connect to a PostgreSQL server.'));
     }
 
     /**
