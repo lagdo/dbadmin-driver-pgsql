@@ -26,7 +26,7 @@ class Database extends AbstractDatabase
         $queries = $this->getQueries($tableAttrs);
         $columns = $this->getNewColumns($tableAttrs);
         $columns = array_merge($columns, $tableAttrs->foreign);
-        array_unshift($queries, 'CREATE TABLE ' . $this->driver->table($tableAttrs->name) .
+        array_unshift($queries, 'CREATE TABLE ' . $this->driver->escapeTableName($tableAttrs->name) .
             '(' . implode(', ', $columns) . ')');
         foreach ($queries as $query) {
             $this->driver->execute($query);
@@ -42,12 +42,12 @@ class Database extends AbstractDatabase
         $queries = $this->getQueries($tableAttrs);
         $columns = $this->getColumnChanges($tableAttrs);
         if ($tableAttrs->name !== '' && $table !== $tableAttrs->name) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) .
-                ' RENAME TO ' . $this->driver->table($tableAttrs->name));
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) .
+                ' RENAME TO ' . $this->driver->escapeTableName($tableAttrs->name));
         }
         $columns = array_merge($columns, $tableAttrs->foreign);
         if (!empty($columns)) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) . ' ' . implode(', ', $columns));
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) . ' ' . implode(', ', $columns));
         }
         // if ($tableAttrs->autoIncrement != '') {
         //     //! $queries[] = 'SELECT setval(pg_get_serial_sequence(' . $this->driver->quote($tableAttrs->name) . ', ), $tableAttrs->autoIncrement)';
@@ -76,7 +76,7 @@ class Database extends AbstractDatabase
             if ($index->type === 'INDEX') {
                 $queries[] = 'CREATE INDEX ' .
                     $this->driver->escapeId($index->name != '' ? $index->name : uniqid($table . '_')) .
-                    ' ON ' . $this->driver->table($table) . ' (' . implode(', ', $index->columns) . ')';
+                    ' ON ' . $this->driver->escapeTableName($table) . ' (' . implode(', ', $index->columns) . ')';
             } else {
                 //! descending UNIQUE indexes results in syntax error
                 $constraint = ($index->name != '' ? ' CONSTRAINT ' . $this->driver->escapeId($index->name) : '');
@@ -85,7 +85,7 @@ class Database extends AbstractDatabase
             }
         }
         if (!empty($columns)) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->table($table) . implode(', ', $columns));
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) . implode(', ', $columns));
         }
         foreach ($queries as $query) {
             $this->driver->execute($query);
@@ -154,7 +154,7 @@ class Database extends AbstractDatabase
     {
         foreach ($tables as $table) {
             $status = $this->driver->tableStatus($table);
-            if (!$this->driver->execute('DROP ' . strtoupper($status->engine) . ' ' . $this->driver->table($table))) {
+            if (!$this->driver->execute('DROP ' . strtoupper($status->engine) . ' ' . $this->driver->escapeTableName($table))) {
                 return false;
             }
         }

@@ -18,9 +18,9 @@ class Query extends AbstractQuery
      */
     protected function limitToOne(string $table, string $query, string $where)
     {
-        return (preg_match('~^INTO~', $query) ? $this->driver->limit($query, $where, 1, 0) :
+        return (preg_match('~^INTO~', $query) ? $this->driver->getLimitClause($query, $where, 1, 0) :
             " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ? $where :
-            " WHERE ctid = (SELECT ctid FROM " . $this->driver->table($table) . $where . ' LIMIT 1)'));
+            " WHERE ctid = (SELECT ctid FROM " . $this->driver->escapeTableName($table) . $where . ' LIMIT 1)'));
     }
 
     /**
@@ -38,10 +38,10 @@ class Query extends AbstractQuery
                 }
             }
             if (!(
-                ($where && $this->driver->execute("UPDATE " . $this->driver->table($table) .
+                ($where && $this->driver->execute("UPDATE " . $this->driver->escapeTableName($table) .
                 " SET " . implode(", ", $update) . " WHERE " . implode(" AND ", $where)) &&
                 $this->driver->affectedRows()) ||
-                $this->driver->execute("INSERT INTO " . $this->driver->table($table) .
+                $this->driver->execute("INSERT INTO " . $this->driver->escapeTableName($table) .
                 " (" . implode(", ", array_keys($set)) . ") VALUES (" . implode(", ", $set) . ")")
             )) {
                 return false;

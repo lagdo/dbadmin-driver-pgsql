@@ -36,7 +36,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function sqlForForeignKeys(string $table)
+    public function getForeignKeysQuery(string $table)
     {
         $query = "";
 
@@ -95,7 +95,7 @@ class Grammar extends AbstractGrammar
         // Fields definitions
         foreach ($fields as $field_name => $field) {
             $clauses[] = $this->escapeId($field->name) . ' ' . $field->fullType .
-                $this->driver->defaultValue($field) . ($field->null ? "" : " NOT NULL");
+                $this->driver->getDefaultValueClause($field) . ($field->null ? "" : " NOT NULL");
         }
         // Primary + unique keys
         foreach ($indexes as $index_name => $index) {
@@ -169,7 +169,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function sqlForCreateTable(string $table, bool $autoIncrement, string $style)
+    public function getCreateTableQuery(string $table, bool $autoIncrement, string $style)
     {
         $status = $this->driver->tableStatus($table);
         if ($status !== null && $this->driver->isView($status)) {
@@ -202,15 +202,15 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function sqlForTruncateTable(string $table)
+    public function getTruncateTableQuery(string $table)
     {
-        return "TRUNCATE " . $this->table($table);
+        return "TRUNCATE " . $this->escapeTableName($table);
     }
 
     /**
      * @inheritDoc
      */
-    public function sqlForCreateTrigger(string $table)
+    public function getCreateTriggerQuery(string $table)
     {
         $status = $this->driver->tableStatus($table);
         $query = "";
@@ -227,7 +227,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function sqlForUseDatabase(string $database)
+    public function getUseDatabaseQuery(string $database)
     {
         return "\connect " . $this->escapeId($database);
     }

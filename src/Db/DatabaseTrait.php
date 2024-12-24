@@ -25,10 +25,10 @@ trait DatabaseTrait
             $val = $field[1];
             $val5 = $val[5] ?? '';
             if ($val[0] !== '' && $column !== $val[0]) {
-                $queries[] = 'ALTER TABLE ' . $this->driver->table($tableAttrs->name) . " RENAME $column TO $val[0]";
+                $queries[] = 'ALTER TABLE ' . $this->driver->escapeTableName($tableAttrs->name) . " RENAME $column TO $val[0]";
             }
             if ($column !== '' || $val5 !== '') {
-                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->table($tableAttrs->name) .
+                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->escapeTableName($tableAttrs->name) .
                     ".$val[0] IS " . ($val5 !== '' ? substr($val5, 9) : "''");
             }
         }
@@ -47,7 +47,7 @@ trait DatabaseTrait
             $val = $field[1];
             $val5 = $val[5] ?? '';
             if ($column !== '' || $val5 !== '') {
-                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->table($tableAttrs->name) .
+                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->escapeTableName($tableAttrs->name) .
                     ".$val[0] IS " . ($val5 !== '' ? substr($val5, 9) : "''");
             }
         }
@@ -67,7 +67,7 @@ trait DatabaseTrait
         $this->_getRenameColumnQueries($tableAttrs, $queries);
         $this->_getColumnCommentQueries($tableAttrs, $queries);
         if ($tableAttrs->comment !== '') {
-            $queries[] = 'COMMENT ON TABLE ' . $this->driver->table($tableAttrs->name) .
+            $queries[] = 'COMMENT ON TABLE ' . $this->driver->escapeTableName($tableAttrs->name) .
                 ' IS ' . $this->driver->quote($tableAttrs->comment);
         }
 
@@ -166,7 +166,7 @@ trait DatabaseTrait
         foreach (array_merge($tables, $views) as $table) {
             $status = $this->driver->tableStatus($table);
             if (!$this->driver->execute('ALTER ' . strtoupper($status->engine) . ' ' .
-                $this->driver->table($table) . ' SET SCHEMA ' . $this->driver->escapeId($target))) {
+                $this->driver->escapeTableName($table) . ' SET SCHEMA ' . $this->driver->escapeId($target))) {
                 return false;
             }
         }
@@ -179,7 +179,7 @@ trait DatabaseTrait
     public function truncateTables(array $tables)
     {
         $this->driver->execute('TRUNCATE ' . implode(', ', array_map(function ($table) {
-            return $this->driver->table($table);
+            return $this->driver->escapeTableName($table);
         }, $tables)));
         return true;
     }
