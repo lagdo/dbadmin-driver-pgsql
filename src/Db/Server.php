@@ -6,6 +6,7 @@ use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
 
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 
+use function in_array;
 use function is_a;
 use function intval;
 
@@ -55,7 +56,16 @@ class Server extends AbstractServer
      */
     public function isInformationSchema(string $database)
     {
-        return ($database == "information_schema");
+        return $database == "information_schema";
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isSystemSchema(string $database)
+    {
+        return in_array($database, ['information_schema',
+            'pg_catalog', 'pg_toast', 'postgres', 'template0', 'template1']);
     }
 
     /**
