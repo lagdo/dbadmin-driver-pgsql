@@ -45,12 +45,12 @@ class Connection extends AbstractConnection
         }
 
         if ($this->driver->minVersion(9, 0)) {
-            if (pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
+            if (@pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
                 $this->driver->setError(pg_last_error($this->client));
             }
         }
         if (($schema)) {
-            if (pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema)) === false) {
+            if (@pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema)) === false) {
                 $this->driver->setError(pg_last_error($this->client));
             }
         }
@@ -105,7 +105,7 @@ class Connection extends AbstractConnection
      */
     public function query(string $query, bool $unbuffered = false)
     {
-        $result = pg_query($this->client, $query);
+        $result = @pg_query($this->client, $query);
         $this->driver->setError();
         if ($result === false) {
             $this->driver->setError(pg_last_error($this->client));
@@ -158,7 +158,7 @@ class Connection extends AbstractConnection
             $field = $this->defaultField();
         }
         $result = $this->driver->execute($query);
-        if ($result === null || !$result->rowCount()) {
+        if (!$result || !$result->rowCount()) {
             return null;
         }
         // return pg_fetch_result($result->result, 0, $field);
