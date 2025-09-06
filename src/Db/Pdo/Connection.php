@@ -19,10 +19,9 @@ class Connection extends PdoConnection
     */
     public function open(string $database, string $schema = '')
     {
-        $server = str_replace(":", "' port='", addcslashes($this->driver->options('server'), "'\\"));
-        $options = $this->driver->options();
-        $username = $options['username'];
-        $password = $options['password'];
+        $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
+        $username = $this->options['username'];
+        $password = $this->options['password'];
         $database = ($database) ? addcslashes($database, "'\\") : "postgres";
         if (!$password) {
             $password = '';

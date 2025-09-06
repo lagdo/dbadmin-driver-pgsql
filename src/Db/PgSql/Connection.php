@@ -25,10 +25,9 @@ class Connection extends AbstractConnection
      */
     public function open(string $database, string $schema = '')
     {
-        $server = str_replace(":", "' port='", addcslashes($this->driver->options('server'), "'\\"));
-        $options = $this->driver->options();
-        $username = addcslashes($options['username'], "'\\");
-        $password = addcslashes($options['password'], "'\\");
+        $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
+        $username = addcslashes($this->options['username'], "'\\");
+        $password = addcslashes($this->options['password'], "'\\");
         $database = ($database) ? addcslashes($database, "'\\") : "postgres";
 
         $connString = "host='$server' user='$username' password='$password' dbname='$database'";

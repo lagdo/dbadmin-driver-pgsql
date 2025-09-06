@@ -98,14 +98,14 @@ class Driver extends AbstractDriver
      * @inheritDoc
      * @throws AuthException
      */
-    protected function createConnection()
+    public function createConnection(array $options)
     {
         if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
-            $connection = new Db\PgSql\Connection($this, $this->utils, 'PgSQL');
+            $connection = new Db\PgSql\Connection($this, $this->utils, $options, 'PgSQL');
             return $this->connection = $connection;
         }
         if (extension_loaded("pdo_pgsql")) {
-            $connection = new Db\Pdo\Connection($this, $this->utils, 'PDO_PgSQL');
+            $connection = new Db\Pdo\Connection($this, $this->utils, $options, 'PDO_PgSQL');
             return $this->connection = $connection;
         }
         throw new AuthException($this->utils->trans->lang('No package installed to connect to a PostgreSQL server.'));

@@ -34,9 +34,9 @@ class Driver extends PgSqlDriver
     /**
      * @inheritDoc
      */
-    protected function createConnection()
+    public function createConnection(array $options)
     {
-        $this->testConnection = new Connection($this, $this->utils, 'test');
+        $this->testConnection = new Connection($this, $this->utils, $options, 'test');
         $this->connection = $this->testConnection;
         $this->server = new Server($this, $this->utils);
         $this->database = new Database($this, $this->utils);
