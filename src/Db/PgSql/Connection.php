@@ -4,12 +4,15 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;
+use Lagdo\DbAdmin\Driver\PgSql\Db\ConnectionTrait;
 
 /**
  * PostgreSQL driver to be used with the pgsql PHP extension.
  */
 class Connection extends AbstractConnection
 {
+    use ConnectionTrait;
+
     /**
      * @var mixed
      */
@@ -39,18 +42,18 @@ class Connection extends AbstractConnection
         // }
 
         if (!$this->client) {
-            $this->driver->setError($this->utils->trans->lang('Unable to connect to database server.'));
+            $this->setError($this->utils->trans->lang('Unable to connect to database server.'));
             return false;
         }
 
         if ($this->driver->minVersion(9, 0)) {
             if (@pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
-                $this->driver->setError(pg_last_error($this->client));
+                $this->setError(pg_last_error($this->client));
             }
         }
         if (($schema)) {
             if (@pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema)) === false) {
-                $this->driver->setError(pg_last_error($this->client));
+                $this->setError(pg_last_error($this->client));
             }
         }
         pg_set_client_encoding($this->client, "UTF8");
@@ -105,9 +108,9 @@ class Connection extends AbstractConnection
     public function query(string $query, bool $unbuffered = false)
     {
         $result = @pg_query($this->client, $query);
-        $this->driver->setError();
+        $this->setError();
         if ($result === false) {
-            $this->driver->setError(pg_last_error($this->client));
+            $this->setError(pg_last_error($this->client));
             $statement = false;
         } elseif (!pg_num_fields($result)) {
             $this->setAffectedRows(pg_affected_rows($result));
