@@ -100,7 +100,8 @@ class Driver extends AbstractDriver
      */
     public function createConnection(array $options)
     {
-        if (!$this->options('prefer_pdo', false) && extension_loaded("pgsql")) {
+        $preferPdo = $options['prefer_pdo'] ?? false;
+        if (!$preferPdo && extension_loaded("pgsql")) {
             $connection = new Db\PgSql\Connection($this, $this->utils, $options, 'PgSQL');
             return $this->connection = $connection;
         }
