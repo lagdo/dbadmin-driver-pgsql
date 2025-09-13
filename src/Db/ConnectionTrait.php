@@ -19,4 +19,12 @@ trait ConnectionTrait
         }
         return $message;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function explain(string $query)
+    {
+        return $this->query("EXPLAIN $query");
+    }
 }

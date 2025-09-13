@@ -112,14 +112,6 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function explain(ConnectionInterface $connection, string $query)
-    {
-        return $connection->query("EXPLAIN $query");
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function user()
     {
         return $this->driver->result("SELECT user");
