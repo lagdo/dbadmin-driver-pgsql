@@ -130,7 +130,7 @@ class Connection extends AbstractConnection
      */
     public function multiQuery(string $query)
     {
-        $this->statement = $this->driver->execute($query);
+        $this->statement = $this->query($query);
         return $this->statement !== false;
     }
 
@@ -149,23 +149,6 @@ class Connection extends AbstractConnection
     {
         // PgSQL extension doesn't support multiple results
         return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function result(string $query, int $field = -1)
-    {
-        if ($field < 0) {
-            $field = $this->defaultField();
-        }
-        $result = $this->driver->execute($query);
-        if (!$result || !$result->rowCount()) {
-            return null;
-        }
-        // return pg_fetch_result($result->result, 0, $field);
-        $row = $result->fetchRow();
-        return is_array($row) && count($row) > $field ? $row[$field] : null;
     }
 
     /**

@@ -75,6 +75,8 @@ class Driver extends AbstractDriver
      */
     protected function afterConnection()
     {
+        $this->server->setConnection($this->connection);
+
         if ($this->minVersion(9.3)) {
             $this->config->features[] = 'materializedview';
         }
