@@ -6,9 +6,7 @@ use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
 use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
 use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
-
 use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
-
 use Lagdo\DbAdmin\Driver\Db\Table as AbstractTable;
 
 class Table extends AbstractTable

@@ -17,7 +17,7 @@ trait TableTrait
     private function queryStatus(string $table = '')
     {
         $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
-            "WHEN 'r' THEN 'table' WHEN 'm' THEN 'materialized view' ELSE 'view' END AS \"Engine\", " .
+            "WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' ELSE 'table' END AS \"Engine\", " .
             "pg_relation_size(c.oid) AS \"Data_length\", " .
             "pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\", " .
             "obj_description(c.oid, 'pg_class') AS \"Comment\", " .
@@ -34,7 +34,7 @@ trait TableTrait
      *
      * @return TableEntity
      */
-    private function makeStatus(array $row)
+    private function makeStatus(array $row): TableEntity
     {
         $status = new TableEntity($row['Name']);
         $status->engine = $row['Engine'];
@@ -115,7 +115,7 @@ trait TableTrait
             'timestamp with time zone' => 'timestamptz',
         ];
         preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $row["full_type"], $match);
-        list(, $type, $_length, $length, $addon, $array) = $match;
+        [, $type, $_length, $length, $addon, $array] = $match;
         $length .= $array;
         $checkType = $type . $addon;
         if (isset($aliases[$checkType])) {
@@ -143,7 +143,7 @@ trait TableTrait
         $field->default = $this->getFieldDefault($row);
         $field->comment = $row["comment"];
         //! No collation, no info about primary keys
-        list($field->length, $field->type, $field->fullType) = $this->getFieldTypes($row);
+        [$field->length, $field->type, $field->fullType] = $this->getFieldTypes($row);
         $field->null = !$row["attnotnull"];
         $field->autoIncrement = $row['identity'] || preg_match('~^nextval\(~i', $row["default"] ?? '');
         $field->privileges = ["insert" => 1, "select" => 1, "update" => 1];

@@ -4,9 +4,7 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-
 use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
-
 use Lagdo\DbAdmin\Driver\Db\Query as AbstractQuery;
 
 use function strtoupper;
@@ -97,7 +95,7 @@ class Query extends AbstractQuery
             'select' => trim($this->driver->result("SELECT pg_get_viewdef(" .
                 $this->driver->result("SELECT oid FROM pg_class WHERE relnamespace = " .
                 "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = " .
-                $this->driver->quote($name)) . ")"))
+                $this->driver->quote($name)) . ")") ?? ''),
         ];
     }
 
