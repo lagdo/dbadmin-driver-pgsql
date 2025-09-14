@@ -2,10 +2,8 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Tests;
 
-use Lagdo\DbAdmin\Driver\Utils\Str;
-use Lagdo\DbAdmin\Driver\Utils\Utils;
+use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
-use Lagdo\DbAdmin\Driver\Utils\Input;
 use Lagdo\DbAdmin\Driver\Fake\DriverTrait;
 use Lagdo\DbAdmin\Driver\Fake\Translator;
 use Lagdo\DbAdmin\Driver\Fake\Connection;
@@ -15,6 +13,9 @@ use Lagdo\DbAdmin\Driver\PgSql\Db\Table;
 use Lagdo\DbAdmin\Driver\PgSql\Db\Query;
 use Lagdo\DbAdmin\Driver\PgSql\Db\Grammar;
 use Lagdo\DbAdmin\Driver\PgSql\Driver as PgSqlDriver;
+use Lagdo\DbAdmin\Driver\Utils\Str;
+use Lagdo\DbAdmin\Driver\Utils\Utils;
+use Lagdo\DbAdmin\Driver\Utils\Input;
 
 class Driver extends PgSqlDriver
 {
@@ -48,8 +49,8 @@ class Driver extends PgSqlDriver
     /**
      * @inheritDoc
      */
-    public function connect(string $database, string $schema = '')
+    public function newConnection(string $database, string $schema = ''): ConnectionInterface
     {
-        AbstractDriver::connect($database, $schema);
+        return AbstractDriver::newConnection($database, $schema);
     }
 }

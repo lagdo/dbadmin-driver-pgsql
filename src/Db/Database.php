@@ -127,7 +127,7 @@ class Database extends AbstractDatabase
             implode("','", $this->systemSchemas) . "')";
         foreach ($databases as $database) {
             $counts[$database] = 0;
-            $connection = $this->driver->connect($database); // New connection
+            $connection = $this->driver->newConnection($database); // New connection
             if (!$connection) {
                 continue;
             }
