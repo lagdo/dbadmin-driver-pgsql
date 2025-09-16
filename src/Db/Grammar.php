@@ -11,7 +11,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function escapeId($idf)
+    public function escapeId(string $idf): string
     {
         return '"' . str_replace('"', '""', $idf) . '"';
     }
@@ -235,7 +235,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    protected function queryRegex()
+    public function queryRegex()
     {
         return '\\s*|[\'"]|/\*|-- |$|\$[^$]*\$';
     }

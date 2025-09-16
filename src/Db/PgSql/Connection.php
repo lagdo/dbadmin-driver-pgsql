@@ -26,7 +26,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function open(string $database, string $schema = '')
+    public function open(string $database, string $schema = ''): bool
     {
         $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
         $username = addcslashes($this->options['username'], "'\\");
@@ -83,7 +83,7 @@ class Connection extends AbstractConnection
     public function value($value, TableFieldEntity $field)
     {
         $type = $field->type;
-        return ($type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value);
+        return $type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value;
     }
 
     /**
@@ -97,7 +97,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function close()
+    public function close(): void
     {
         // $this->client = pg_connect("{$this->_string} dbname='postgres'");
     }
@@ -154,7 +154,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function warnings()
+    protected function warnings(): string
     {
         // second parameter is available since PHP 7.1.0
         return $this->utils->str->html(pg_last_notice($this->client));

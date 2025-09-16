@@ -20,7 +20,7 @@ class Connection extends PdoConnection
     /**
     * @inheritDoc
     */
-    public function open(string $database, string $schema = '')
+    public function open(string $database, string $schema = ''): bool
     {
         $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
         $username = $this->options['username'];
@@ -65,7 +65,7 @@ class Connection extends PdoConnection
     /**
      * @inheritDoc
      */
-    public function warnings()
+    protected function warnings(): string
     {
         return ''; // not implemented in PDO_PgSQL as of PHP 7.2.1
     }

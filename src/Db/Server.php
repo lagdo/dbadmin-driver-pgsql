@@ -155,14 +155,6 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    // public function connectionId()
-    // {
-    //     return "SELECT pg_backend_pid()";
-    // }
-
-    /**
-     * @inheritDoc
-     */
     // public function maxConnections()
     // {
     //     return $this->driver->result("SHOW max_connections");

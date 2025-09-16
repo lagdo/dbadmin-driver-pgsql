@@ -73,10 +73,8 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function afterConnection()
+    protected function configConnection()
     {
-        $this->server->setConnection($this->connection);
-
         if ($this->minVersion(9.3)) {
             $this->config->features[] = 'materializedview';
         }
@@ -94,6 +92,14 @@ class Driver extends AbstractDriver
                 $this->config->structuredTypes[$this->utils->trans->lang('User types')][] = $type;
             }
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function openedConnection()
+    {
+        $this->server->setConnection($this->connection);
     }
 
     /**
