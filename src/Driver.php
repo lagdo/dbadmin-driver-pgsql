@@ -110,12 +110,10 @@ class Driver extends AbstractDriver
     {
         $preferPdo = $options['prefer_pdo'] ?? false;
         if (!$preferPdo && extension_loaded("pgsql")) {
-            $connection = new Db\PgSql\Connection($this, $this->utils, $options, 'PgSQL');
-            return $this->connection = $connection;
+            return new Db\PgSql\Connection($this, $this->utils, $options, 'PgSQL');
         }
         if (extension_loaded("pdo_pgsql")) {
-            $connection = new Db\Pdo\Connection($this, $this->utils, $options, 'PDO_PgSQL');
-            return $this->connection = $connection;
+            return new Db\Pdo\Connection($this, $this->utils, $options, 'PDO_PgSQL');
         }
         throw new AuthException($this->utils->trans->lang('No package installed to connect to a PostgreSQL server.'));
     }

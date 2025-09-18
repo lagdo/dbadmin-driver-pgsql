@@ -2,8 +2,6 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Tests;
 
-use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
-use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
 use Lagdo\DbAdmin\Driver\Fake\DriverTrait;
 use Lagdo\DbAdmin\Driver\Fake\Translator;
 use Lagdo\DbAdmin\Driver\Fake\Connection;
@@ -44,13 +42,5 @@ class Driver extends PgSqlDriver
         $this->grammar = new Grammar($this, $this->utils);
 
         return $this->connection;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function newConnection(string $database, string $schema = ''): ConnectionInterface
-    {
-        return AbstractDriver::newConnection($database, $schema);
     }
 }
