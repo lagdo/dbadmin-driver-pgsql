@@ -4,7 +4,26 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;
+use Lagdo\DbAdmin\Driver\Db\PreparedStatement;
+use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 use Lagdo\DbAdmin\Driver\PgSql\Db\ConnectionTrait;
+
+use function addcslashes;
+use function pg_affected_rows;
+use function pg_connect;
+use function pg_escape_bytea;
+use function pg_escape_string;
+use function pg_last_error;
+use function pg_num_fields;
+use function pg_query;
+use function pg_set_client_encoding;
+use function pg_unescape_bytea;
+use function pg_version;
+use function str_replace;
+use function uniqid;
+use function pg_prepare;
+use function pg_execute;
+use function pg_last_notice;
 
 /**
  * PostgreSQL driver to be used with the pgsql PHP extension.
@@ -31,7 +50,7 @@ class Connection extends AbstractConnection
         $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
         $username = addcslashes($this->options['username'], "'\\");
         $password = addcslashes($this->options['password'], "'\\");
-        $database = ($database) ? addcslashes($database, "'\\") : "postgres";
+        $database = !$database ? 'postgres' : addcslashes($database, "'\\");
 
         $connString = "host='$server' user='$username' password='$password' dbname='$database'";
         $this->client = pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
@@ -65,6 +84,9 @@ class Connection extends AbstractConnection
      */
     public function serverInfo()
     {
+        if (!$this->client) {
+            return '';
+        }
         $version = pg_version($this->client);
         return $version["server"];
     }
@@ -149,6 +171,34 @@ class Connection extends AbstractConnection
     {
         // PgSQL extension doesn't support multiple results
         return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function prepareStatement(string $query): PreparedStatement
+    {
+        // PgSQL extension uses '$n' as placeholders for query params.
+        [$params, $query] = $this->getPreparedParams($query, true);
+        // The prepared statement needs a unique name.
+        $name = uniqid('st');
+        $statement = pg_prepare($this->client, $name, $query);
+        return new PreparedStatement($query, $statement, $params, $name);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function executeStatement(PreparedStatement $statement,
+        array $values): ?StatementInterface
+    {
+        if (!$statement->prepared()) {
+            return null;
+        }
+
+        $values = $statement->paramValues($values, false);
+        $result = pg_execute($this->client, $statement->name(), $values);
+        return !$result ? null : new Statement($result);
     }
 
     /**
