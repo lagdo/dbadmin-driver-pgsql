@@ -108,20 +108,4 @@ class Query extends AbstractQuery
         $this->driver->execute("SET statement_timeout = " . (1000 * $timeout));
         return $query;
     }
-
-    /**
-     * @inheritDoc
-     */
-    public function user()
-    {
-        return $this->driver->result("SELECT user");
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function schema()
-    {
-        return $this->driver->result("SELECT current_schema()");
-    }
 }

@@ -14,6 +14,22 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
+    public function user()
+    {
+        return $this->driver->result("SELECT user");
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function schema()
+    {
+        return $this->driver->result("SELECT current_schema()");
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function databases(bool $flush)
     {
         $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
