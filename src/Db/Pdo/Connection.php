@@ -65,6 +65,15 @@ class Connection extends PdoConnection
     /**
      * @inheritDoc
      */
+    public function nextResult()
+    {
+        // PgSQL extension doesn't support multiple results
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
     protected function warnings(): string
     {
         return ''; // not implemented in PDO_PgSQL as of PHP 7.2.1
