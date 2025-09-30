@@ -179,7 +179,8 @@ class Connection extends AbstractConnection
     public function prepareStatement(string $query): PreparedStatement
     {
         // PgSQL extension uses '$n' as placeholders for query params.
-        [$params, $query] = $this->getPreparedParams($query, true);
+        $replace = fn($name, $pos) => '$' . $pos;
+        [$params, $query] = $this->getPreparedParams($query, $replace);
         // The prepared statement needs a unique name.
         $name = uniqid('st');
         $statement = pg_prepare($this->client, $name, $query);
