@@ -88,6 +88,7 @@ trait DatabaseTrait
         foreach ($tableAttrs->fields as $field) {
             $val = $field[1];
             if (isset($val[6])) { // auto increment
+                // Todo: use match
                 $val[1] = ($val[1] === ' bigint' ? ' big' : ($val[1] === ' smallint' ? ' small' : ' ')) . 'serial';
             }
             $columns[] = implode($val);
@@ -110,6 +111,7 @@ trait DatabaseTrait
         foreach ($tableAttrs->fields as $field) {
             $val = $field[1];
             if (isset($val[6])) { // auto increment
+                // Todo: use match
                 $val[1] = ($val[1] === ' bigint' ? ' big' : ($val[1] === ' smallint' ? ' small' : ' ')) . 'serial';
             }
             $columns[] = 'ADD ' . implode($val);

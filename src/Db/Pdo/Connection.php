@@ -25,7 +25,7 @@ class Connection extends PdoConnection
         $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
         $username = $this->options['username'];
         $password = $this->options['password'];
-        $database = ($database) ? addcslashes($database, "'\\") : "postgres";
+        $database = !$database ? 'postgres' : addcslashes($database, "'\\");
         if (!$password) {
             $password = '';
         }
