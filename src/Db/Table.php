@@ -180,7 +180,9 @@ class Table extends AbstractTable
         if (!($row = reset($rows))) {
             return null;
         }
-        return new TriggerEntity($row['Timing'], $row['Event'], $row['Statement'], '', $row['Trigger']);
+        return new TriggerEntity($row['Timing'], $row['Event'],
+            $row['Statement'], '', $row['Trigger'],
+            $row['Type'], $row['Events']);
     }
 
     /**

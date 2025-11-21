@@ -3,8 +3,15 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\Grammar as AbstractGrammar;
-
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+
+use function array_map;
+use function implode;
+use function is_string;
+use function ksort;
+use function preg_match;
+use function rtrim;
+use function str_replace;
 
 class Grammar extends AbstractGrammar
 {
@@ -50,7 +57,7 @@ class Grammar extends AbstractGrammar
                 " {$fkey->definition} " . ($fkey->deferrable ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ";\n";
         }
 
-        return ($query ? "$query\n" : $query);
+        return $query ? "$query\n" : $query;
     }
 
     /**
@@ -65,8 +72,9 @@ class Grammar extends AbstractGrammar
         $sequences = [];
         // Fields definitions
         foreach ($fields as $field_name => $field) {
+            $default = $field->hasDefault && is_string($field->default) ? $field->default : '';
             // sequences for fields
-            if (preg_match('~nextval\(\'([^\']+)\'\)~', $field->default, $matches)) {
+            if (preg_match('~nextval\(\'([^\']+)\'\)~', $default, $matches)) {
                 $sequence_name = $matches[1];
                 $rows = $this->driver->rows($this->driver->minVersion(10) ?
                     ("SELECT *, cache_size AS cache_value FROM pg_sequences " .
@@ -204,7 +212,7 @@ class Grammar extends AbstractGrammar
      */
     public function getTruncateTableQuery(string $table)
     {
-        return "TRUNCATE " . $this->escapeTableName($table);
+        return "TRUNCATE " . $this->driver->escapeTableName($table);
     }
 
     /**
@@ -214,11 +222,13 @@ class Grammar extends AbstractGrammar
     {
         $status = $this->driver->tableStatus($table);
         $query = "";
-        foreach ($this->driver->triggers($table) as $trg_id => $trg) {
+        foreach ($this->driver->triggers($table) as $trg_id => $_) {
             $trigger = $this->driver->trigger($trg_id, $status->name);
-            $query .= "\nCREATE TRIGGER " . $this->escapeId($trigger['Trigger']) .
-                " $trigger[Timing] $trigger[Events] ON " . $this->escapeId($status->schema) . "." .
-                $this->escapeId($status->name) . " $trigger[Type] $trigger[Statement];;\n";
+            $triggerName = $this->escapeId($trigger->name);
+            $statusName = $this->escapeId($status->name);
+            $schema = $this->escapeId($status->schema);
+            $query .= "\nCREATE TRIGGER $triggerName {$trigger->timing} {$trigger->events} " .
+                "ON $schema.$statusName {$trigger->type} {$trigger->statement};;\n";
         }
         return $query;
     }
