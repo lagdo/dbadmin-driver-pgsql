@@ -185,15 +185,4 @@ trait DatabaseTrait
         }, $tables)));
         return true;
     }
-
-    /**
-     * @inheritDoc
-     */
-    public function userTypes()
-    {
-        $query = 'SELECT typname FROM pg_type WHERE typnamespace = ' .
-            '(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) ' .
-            "AND typtype IN ('b','d','e') AND typelem = 0";
-        return $this->driver->values($query);
-    }
 }

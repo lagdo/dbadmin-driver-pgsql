@@ -2,13 +2,26 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
-
 use Lagdo\DbAdmin\Driver\Db\Database as AbstractDatabase;
+use Lagdo\DbAdmin\Driver\Entity\FieldType;
+use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
+use Lagdo\DbAdmin\Driver\Entity\RoutineInfoEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\UserTypeEntity;
+
+use function array_map;
+use function array_merge;
+use function array_reverse;
+use function array_unshift;
+use function count;
+use function implode;
+use function is_object;
+use function strtoupper;
+use function uniqid;
 
 class Database extends AbstractDatabase
 {
+    use PgDriverTrait;
     use DatabaseTrait;
 
     /**
@@ -47,7 +60,8 @@ class Database extends AbstractDatabase
         }
         $columns = array_merge($columns, $tableAttrs->foreign);
         if (!empty($columns)) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) . ' ' . implode(', ', $columns));
+            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) .
+                ' ' . implode(', ', $columns));
         }
         // if ($tableAttrs->autoIncrement != '') {
         //     //! $queries[] = 'SELECT setval(pg_get_serial_sequence(' . $this->driver->quote($tableAttrs->name) . ', ), $tableAttrs->autoIncrement)';
@@ -76,7 +90,8 @@ class Database extends AbstractDatabase
             if ($index->type === 'INDEX') {
                 $queries[] = 'CREATE INDEX ' .
                     $this->driver->escapeId($index->name != '' ? $index->name : uniqid($table . '_')) .
-                    ' ON ' . $this->driver->escapeTableName($table) . ' (' . implode(', ', $index->columns) . ')';
+                    ' ON ' . $this->driver->escapeTableName($table) .
+                    ' (' . implode(', ', $index->columns) . ')';
             } else {
                 //! descending UNIQUE indexes results in syntax error
                 $constraint = ($index->name != '' ? ' CONSTRAINT ' . $this->driver->escapeId($index->name) : '');
@@ -85,7 +100,8 @@ class Database extends AbstractDatabase
             }
         }
         if (!empty($columns)) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) . implode(', ', $columns));
+            array_unshift($queries, 'ALTER TABLE ' .
+                $this->driver->escapeTableName($table) . implode(', ', $columns));
         }
         foreach ($queries as $query) {
             $this->driver->execute($query);
@@ -174,44 +190,90 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function routine(string $name, string $type)
+    public function routine(string $name, string $type): RoutineInfoEntity|null
     {
+        $quotedName = $this->driver->quote($name);
         $query = 'SELECT routine_definition AS definition, LOWER(external_language) AS language, * ' .
             'FROM information_schema.routines WHERE routine_schema = current_schema() ' .
-            'AND specific_name = ' . $this->driver->quote($name);
+            "AND specific_name = $quotedName";
         $rows = $this->driver->rows($query);
-        $routines = $rows[0];
-        $routines['returns'] = ['type' => $routines['type_udt_name']];
-        $query = 'SELECT parameter_name AS field, data_type AS type, character_maximum_length AS length, ' .
+        if (!isset($rows[0])) {
+            return null;
+        }
+
+        $definition = $rows[0]['definition'];
+        $language = $rows[0]['language'];
+        $type = $rows[0]['type_udt_name'];
+
+        $query = 'SELECT parameter_name AS name, data_type AS type, character_maximum_length AS length, ' .
             'parameter_mode AS inout FROM information_schema.parameters WHERE specific_schema = current_schema() ' .
-            'AND specific_name = ' . $this->driver->quote($name) . ' ORDER BY ordinal_position';
-        $routines['fields'] = $this->driver->rows($query);
-        return $routines;
+            "AND specific_name = $quotedName ORDER BY ordinal_position";
+        $rows = $this->driver->rows($query);
+        $paramPosition = 0;
+        $params = array_map(function(array $param) use(&$paramPosition) {
+            $paramPosition++;
+            $name = $param['name'] ?: $paramPosition;
+            $type = $param['type'] ?: '';
+            $length = $param['length'] ?: '';
+            $inout = $param['inout'] ?: '';
+            return new FieldType(name: $name, type: $type, length: $length, inout: $inout);
+        }, $this->driver->rows($query));
+
+        return new RoutineInfoEntity($definition, $language,
+            $params, new FieldType(type: $type));
     }
 
     /**
      * @inheritDoc
      */
-    public function routines()
+    public function routines(): array
     {
         $query = 'SELECT specific_name AS "SPECIFIC_NAME", routine_type AS "ROUTINE_TYPE", ' .
             'routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER" ' .
             'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
         $rows = $this->driver->rows($query);
-        return array_map(function($row) {
-            return new RoutineEntity($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'], $row['ROUTINE_TYPE'], $row['DTD_IDENTIFIER']);
-        }, $rows);
+        // The ROUTINE_TYPE field can have NULL as value
+        return array_map(fn($row) =>
+            new RoutineEntity($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'],
+                $row['ROUTINE_TYPE'] ?: '', $row['DTD_IDENTIFIER']), $rows);
     }
 
     /**
      * @inheritDoc
      */
-    public function routineId(string $name, array $row)
+    public function routineId(string $name, array $row): string
     {
-        $routine = [];
+        $types = [];
         foreach ($row['fields'] as $field) {
-            $routine[] = $field->type;
+            $types[] = $field->type;
         }
-        return $this->driver->escapeId($name) . '(' . implode(', ', $routine) . ')';
+        return $this->driver->escapeId($name) . '(' . implode(', ', $types) . ')';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function userTypes(bool $withEnums): array
+    {
+        $query = "SELECT oid, typname AS name FROM pg_type
+WHERE typnamespace = {$this->nsOid} AND typtype IN ('b','d','e') AND typelem = 0";
+        $callback = fn($type) => new UserTypeEntity($type['oid'], $type['name']);
+        $types = array_map($callback, $this->driver->rows($query));
+
+        if (!$withEnums || count($types) === 0) {
+            return $types;
+        }
+
+        $typeOids = implode("','", array_map(fn($type) => $type->oid, $types));
+        $query = "SELECT enumtypid, enumlabel FROM pg_enum
+WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
+        foreach ($this->driver->rows($query) as $enum) {
+            foreach ($types as $type) {
+                if ($type->oid === $enum['enumtypid']) {
+                    $type->enums[] = $enum['enumlabel'];
+                }
+            }
+        }
+        return $types;
     }
 }

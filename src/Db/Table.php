@@ -3,14 +3,19 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
-use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
+use Lagdo\DbAdmin\Driver\Entity\PartitionEntity;
 use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
-use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 use Lagdo\DbAdmin\Driver\Db\Table as AbstractTable;
+
+use function array_filter;
+use function array_map;
+use function implode;
+use function in_array;
+use function str_replace;
 
 class Table extends AbstractTable
 {
+    use PgDriverTrait;
     use TableTrait;
 
     /**
@@ -123,15 +128,15 @@ class Table extends AbstractTable
      */
     public function indexes(string $table)
     {
+        $tableOid = $this->tableOid($table);
+        $columns = $this->driver->keyValues("SELECT attnum, attname
+FROM pg_attribute WHERE attrelid = $tableOid AND attnum > 0");
+
+        $query = "SELECT relname, indisunique::int, indisprimary::int, indkey, indoption, amname,
+pg_get_expr(indpred, indrelid, true) AS partial, pg_get_expr(indexprs, indrelid) AS indexpr
+FROM pg_index JOIN pg_class ON indexrelid = oid JOIN pg_am ON pg_am.oid = pg_class.relam
+WHERE indrelid = $tableOid ORDER BY indisprimary DESC, indisunique DESC";
         $indexes = [];
-        $table_oid = $this->driver->result("SELECT oid FROM pg_class WHERE " .
-            "relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()) " .
-            "AND relname = " . $this->driver->quote($table));
-        $columns = $this->driver->keyValues("SELECT attnum, attname FROM pg_attribute WHERE " .
-            "attrelid = $table_oid AND attnum > 0");
-        $query = "SELECT relname, indisunique::int, indisprimary::int, indkey, indoption, " .
-            "(indpred IS NOT NULL)::int as indispartial FROM pg_index i, pg_class ci " .
-            "WHERE i.indrelid = $table_oid AND ci.oid = i.indexrelid";
         foreach ($this->driver->rows($query) as $row)
         {
             $indexes[$row["relname"]] = $this->makeIndexEntity($row, $columns);
@@ -144,12 +149,12 @@ class Table extends AbstractTable
      */
     public function foreignKeys(string $table)
     {
+        $table = $this->driver->quote($table);
         $foreignKeys = [];
-        $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid) " .
-            "AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc " .
-            "INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = " .
-            $this->driver->quote($table) .
-            " AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conname";
+        $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid)
+AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc
+INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = $table
+AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conname";
         foreach ($this->driver->rows($query) as $row) {
             $foreignKey = $this->makeForeignKeyEntity($row);
             if ($foreignKey !== null) {
@@ -157,6 +162,50 @@ class Table extends AbstractTable
             }
         }
         return $foreignKeys;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function checkConstraints(TableEntity $status): array
+    {
+        // From driver.inc.php
+        $database = $this->driver->quote($this->driver->database());
+        $schema = $this->driver->quote($status->schema);
+        $table = $this->driver->quote($status->name);
+        $query = "SELECT c.CONSTRAINT_NAME, c.CHECK_CLAUSE
+FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS c
+JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS t ON c.CONSTRAINT_SCHEMA = t.CONSTRAINT_SCHEMA
+AND c.CONSTRAINT_NAME = t.CONSTRAINT_NAME
+WHERE t.TABLE_CATALOG = $database AND t.TABLE_SCHEMA = $schema AND t.TABLE_NAME = $table
+AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL checks in PostrgreSQL
+        // MariaDB contains CHECK_CONSTRAINTS.TABLE_NAME, MySQL and PostrgreSQL not
+        return $this->driver->keyValues($query);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function partitionsInfo(string $table): PartitionEntity|null
+    {
+        if (!$this->driver->minVersion(10)) {
+            return null;
+        }
+        $query = "SELECT * FROM pg_partitioned_table WHERE partrelid = " . $this->tableOid($table);
+        $row = $this->driver->execute($query)?->fetchAssoc();
+        if (!$row) {
+            return null;
+        }
+
+        $partId = $row['partrelid'];
+        $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
+            str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering
+        $attrs = $this->driver->values($query);
+        $callback = fn($attr) => $this->driver->escapeId($attr);
+        $partitionFields = implode(', ', array_map($callback, $attrs));
+
+        $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];
+        return new PartitionEntity($by[$row['partstrat']], $partitionFields);
     }
 
     /**

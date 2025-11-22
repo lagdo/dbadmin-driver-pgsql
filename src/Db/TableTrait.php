@@ -7,6 +7,15 @@ use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
 use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
 
+use function array_pad;
+use function explode;
+use function in_array;
+use function intval;
+use function preg_match;
+use function preg_replace;
+use function preg_split;
+use function str_replace;
+
 trait TableTrait
 {
     /**
@@ -138,7 +147,7 @@ trait TableTrait
         $field = new TableFieldEntity();
 
         $field->name = $row["field"];
-        $field->primary = \in_array($field->name, $primaryKeyColumns);
+        $field->primary = in_array($field->name, $primaryKeyColumns);
         $field->fullType = $row["full_type"];
         $field->default = $this->getFieldDefault($row);
         $field->comment = $row["comment"];
@@ -157,7 +166,7 @@ trait TableTrait
      */
     private function getIndexType(array $row)
     {
-        if ($row['indispartial']) {
+        if ($row['partial']) {
             return 'INDEX';
         }
         if ($row['indisprimary']) {
@@ -175,20 +184,22 @@ trait TableTrait
      *
      * @return IndexEntity
      */
-    private function makeIndexEntity(array $row, array $columns)
+    private function makeIndexEntity(array $row, array $columns): IndexEntity
     {
         $index = new IndexEntity();
 
         $index->type = $this->getIndexType($row);
-        $index->columns = [];
-        foreach (explode(' ', $row['indkey']) as $indkey) {
-            $index->columns[] = $columns[$indkey];
+        $index->name = $row["relname"];
+        $index->algorithm = $row["amname"];
+		$index->partial = $row["partial"];
+        $indexpr = preg_split('~(?<=\)), (?=\()~', $row["indexpr"] ?? ''); //! '), (' used in expression
+        foreach (explode(" ", $row["indkey"]) as $indkey) {
+            $index->columns[] = ($indkey ? $columns[$indkey] : array_shift($indexpr));
         }
-        $index->descs = [];
-        foreach (explode(' ', $row['indoption']) as $indoption) {
-            $index->descs[] = ($indoption & 1 ? '1' : null); // 1 - INDOPTION_DESC
+        foreach (explode(" ", $row["indoption"]) as $indoption) {
+            $index->descs[] = intval($indoption) & 1 ? '1' : null; // 1 - INDOPTION_DESC
         }
-        $index->lengths = [];
+        // $index->lengths = [];
 
         return $index;
     }
@@ -196,18 +207,19 @@ trait TableTrait
     /**
      * @param array $row
      *
-     * @return ForeignKeyEntity
+     * @return ForeignKeyEntity|null
      */
-    private function makeForeignKeyEntity(array $row)
+    private function makeForeignKeyEntity(array $row): ForeignKeyEntity|null
     {
         if (!preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
             return null;
         }
+
         $onActions = $this->driver->actions();
         $match = array_pad($match, 5, '');
 
         $foreignKey = new ForeignKeyEntity();
-
+        $foreignKey->definition = $row['definition'];
         $foreignKey->source = array_map('trim', explode(',', $match[1]));
         $foreignKey->target = array_map('trim', explode(',', $match[3]));
 

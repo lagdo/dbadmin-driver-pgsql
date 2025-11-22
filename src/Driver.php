@@ -67,7 +67,7 @@ class Driver extends AbstractDriver
         ]];
         $this->config->features = ['database', 'table', 'columns', 'sql', 'indexes', 'descidx',
             'comment', 'view', 'scheme', 'routine', 'processlist', 'sequence', 'trigger',
-            'type', 'variables', 'drop_col', 'kill', 'dump', 'fkeys_sql'];
+            'type', 'variables', 'drop_col', 'kill', 'dump'];
     }
 
     /**
@@ -86,10 +86,11 @@ class Driver extends AbstractDriver
                 $this->config->types["jsonb"] = 4294967295;
             }
         }
-        foreach ($this->userTypes() as $type) { //! get types from current_schemas('t')
-            if (!isset($this->config->types[$type])) {
-                $this->config->types[$type] = 0;
-                $this->config->structuredTypes[$this->utils->trans->lang('User types')][] = $type;
+        foreach ($this->userTypes(false) as $type) { //! get types from current_schemas('t')
+            $name = $type->name;
+            if (!isset($this->config->types[$name])) {
+                $this->config->types[$name] = 0;
+                $this->config->structuredTypes[$this->utils->trans->lang('User types')][] = $name;
             }
         }
     }
