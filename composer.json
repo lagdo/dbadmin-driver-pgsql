@@ -16,7 +16,7 @@
         "source": "https://github.com/lagdo/dbadmin-driver-pgsql"
     },
     "require": {
-        "lagdo/dbadmin-driver": "^0.16"
+        "lagdo/dbadmin-driver": "^0.17"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.5",
