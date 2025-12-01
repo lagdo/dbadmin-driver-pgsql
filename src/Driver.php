@@ -53,21 +53,23 @@ class Driver extends AbstractDriver
                 "path" => 0, "point" => 0, "polygon" => 0],
         ]);
         // $this->config->unsigned = [];
-        $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE", "LIKE %%", "ILIKE",
-            "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT IN", "IS NOT NULL"]; // no "SQL" to avoid CSRF
+        $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE",
+            "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT ILIKE",
+            "NOT IN", "IS NOT NULL", "SQL"]; // no "SQL" to avoid CSRF
         $this->config->functions = ["char_length", "lower", "round", "to_hex", "to_timestamp", "upper"];
         $this->config->grouping = ["avg", "count", "count distinct", "max", "min", "sum"];
-        $this->config->editFunctions = [[
+        $this->config->insertFunctions = [
             "char" => "md5",
             "date|time" => "now",
-        ],[
+        ];
+        $this->config->editFunctions = [
             $this->numberRegex() => "+/-",
             "date|time" => "+ interval/- interval", //! escape
             "char|text" => "||",
-        ]];
-        $this->config->features = ['database', 'table', 'columns', 'sql', 'indexes', 'descidx',
-            'comment', 'view', 'scheme', 'routine', 'processlist', 'sequence', 'trigger',
-            'type', 'variables', 'drop_col', 'kill', 'dump'];
+        ];
+        $this->config->features = ['check', 'columns', 'comment', 'database', 'drop_col', 'dump',
+            'descidx', 'indexes', 'kill', 'partial_indexes', 'routine', 'scheme', 'sequence',
+            'sql', 'table', 'trigger', 'type', 'variables', 'view'];
     }
 
     /**
@@ -75,23 +77,36 @@ class Driver extends AbstractDriver
      */
     protected function configConnection()
     {
-        if ($this->minVersion(9.3)) {
-            $this->config->features[] = 'materializedview';
-        }
-        if ($this->minVersion(9.2)) {
-            $this->config->structuredTypes[$this->utils->trans->lang('Strings')][] = "json";
-            $this->config->types["json"] = 4294967295;
-            if ($this->minVersion(9.4)) {
-                $this->config->structuredTypes[$this->utils->trans->lang('Strings')][] = "jsonb";
-                $this->config->types["jsonb"] = 4294967295;
-            }
-        }
         foreach ($this->userTypes(false) as $type) { //! get types from current_schemas('t')
             $name = $type->name;
             if (!isset($this->config->types[$name])) {
                 $this->config->types[$name] = 0;
                 $this->config->structuredTypes[$this->utils->trans->lang('User types')][] = $name;
             }
+        }
+
+        if ($this->minVersion(9.2, 0)) {
+            $this->config->setTypes(['Strings' => ["json" => 4294967295]]);
+            if ($this->minVersion(9.4, 0)) {
+                $this->config->setTypes(['Strings' => ["jsonb" => 4294967295]]);
+            }
+        }
+        if ($this->minVersion(12, 0)) {
+            $this->config->generated = ["STORED"];
+        }
+        $this->config->partitionBy = ["RANGE", "LIST"];
+        // if (!connection()->flavor) {
+        //     $this->config->partitionBy[] = "HASH";
+        // }
+
+        if ($this->minVersion(9.3)) {
+            $this->config->features[] = 'materializedview';
+        }
+        if ($this->minVersion(11)) {
+            $this->config->features[] = 'procedure';
+        }
+        /*if (connection()->flavor == 'cockroach)*/ {
+            $this->config->features[] = 'processlist';
         }
     }
 
