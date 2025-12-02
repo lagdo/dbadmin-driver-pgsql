@@ -3,26 +3,75 @@
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
-use Lagdo\DbAdmin\Driver\Utils\Utils;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
+
+use function extension_loaded;
 
 class Driver extends AbstractDriver
 {
     /**
-     * The constructor
-     *
-     * @param Utils $utils
-     * @param array $options
+     * @var Db\Server|null
      */
-    public function __construct(Utils $utils, array $options)
-    {
-        parent::__construct($utils, $options);
+    private Db\Server|null $server = null;
 
-        $this->server = new Db\Server($this, $this->utils);
-        $this->database = new Db\Database($this, $this->utils);
-        $this->table = new Db\Table($this, $this->utils);
-        $this->query = new Db\Query($this, $this->utils);
-        $this->grammar = new Db\Grammar($this, $this->utils);
+    /**
+     * @var Db\Database|null
+     */
+    private Db\Database|null $database = null;
+
+    /**
+     * @var Db\Table|null
+     */
+    private Db\Table|null $table = null;
+
+    /**
+     * @var Db\Query|null
+     */
+    private Db\Query|null $query = null;
+
+    /**
+     * @var Db\Grammar|null
+     */
+    private Db\Grammar|null $grammar = null;
+
+    /**
+     * @var Db\Server
+     */
+    protected function _server(): Db\Server
+    {
+        return $this->server ?: $this->server = new Db\Server($this, $this->utils);
+    }
+
+    /**
+     * @var Db\Database
+     */
+    protected function _database(): Db\Database
+    {
+        return $this->database ?: $this->database = new Db\Database($this, $this->utils);
+    }
+
+    /**
+     * @var Db\Table
+     */
+    protected function _table(): Db\Table
+    {
+        return $this->table ?: $this->table = new Db\Table($this, $this->utils);
+    }
+
+    /**
+     * @var Db\Grammar
+     */
+    protected function _grammar(): Db\Grammar
+    {
+        return $this->grammar ?: $this->grammar = new Db\Grammar($this, $this->utils);
+    }
+
+    /**
+     * @var Db\Query
+     */
+    protected function _query(): Db\Query
+    {
+        return $this->query ?: $this->query = new Db\Query($this, $this->utils);
     }
 
     /**
@@ -115,7 +164,7 @@ class Driver extends AbstractDriver
      */
     protected function openedConnection()
     {
-        $this->server->setConnection($this->connection);
+        $this->_server()->setConnection($this->connection);
     }
 
     /**
