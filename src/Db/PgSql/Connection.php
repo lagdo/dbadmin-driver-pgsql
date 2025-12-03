@@ -82,7 +82,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function serverInfo()
+    public function serverInfo(): string
     {
         if (!$this->client) {
             return '';
@@ -94,7 +94,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function quote(string $string)
+    public function quote(string $string): string
     {
         return "'" . pg_escape_string($this->client, $string) . "'";
     }
@@ -102,7 +102,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value($value, TableFieldEntity $field)
+    public function value($value, TableFieldEntity $field): mixed
     {
         $type = $field->type;
         return $type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value;
@@ -111,7 +111,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function quoteBinary(string $string)
+    public function quoteBinary(string $string): string
     {
         return "'" . pg_escape_bytea($this->client, $string) . "'";
     }
@@ -127,7 +127,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function query(string $query, bool $unbuffered = false)
+    public function query(string $query, bool $unbuffered = false): StatementInterface|bool
     {
         $result = @pg_query($this->client, $query);
         $this->setError();
@@ -150,7 +150,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function multiQuery(string $query)
+    public function multiQuery(string $query): bool
     {
         $this->statement = $this->query($query);
         return $this->statement !== false;
@@ -159,7 +159,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function storedResult()
+    public function storedResult(): StatementInterface|bool
     {
         return $this->statement;
     }
@@ -167,7 +167,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function nextResult()
+    public function nextResult(): mixed
     {
         // PgSQL extension doesn't support multiple results
         return false;

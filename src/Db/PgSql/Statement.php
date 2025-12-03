@@ -30,7 +30,7 @@ class Statement implements StatementInterface
     /**
      * @inheritDoc
      */
-    public function rowCount()
+    public function rowCount(): int
     {
         return pg_num_rows($this->result);
     }
@@ -38,23 +38,23 @@ class Statement implements StatementInterface
     /**
      * @inheritDoc
      */
-    public function fetchAssoc()
+    public function fetchAssoc(): array|null
     {
-        return pg_fetch_assoc($this->result);
+        return pg_fetch_assoc($this->result) ?: null;
     }
 
     /**
      * @inheritDoc
      */
-    public function fetchRow()
+    public function fetchRow(): array|null
     {
-        return pg_fetch_row($this->result);
+        return pg_fetch_row($this->result) ?: null;
     }
 
     /**
      * @inheritDoc
      */
-    public function fetchField()
+    public function fetchField(): StatementFieldEntity|null
     {
         $column = $this->offset++;
         // $table = function_exists('pg_field_table') ? pg_field_table($this->result, $column) : '';

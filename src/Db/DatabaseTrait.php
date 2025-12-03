@@ -163,7 +163,7 @@ trait DatabaseTrait
     /**
      * @inheritDoc
      */
-    public function moveTables(array $tables, array $views, string $target)
+    public function moveTables(array $tables, array $views, string $target): bool
     {
         foreach (array_merge($tables, $views) as $table) {
             $status = $this->driver->tableStatus($table);
@@ -178,7 +178,7 @@ trait DatabaseTrait
     /**
      * @inheritDoc
      */
-    public function truncateTables(array $tables)
+    public function truncateTables(array $tables): bool
     {
         $this->driver->execute('TRUNCATE ' . implode(', ', array_map(function ($table) {
             return $this->driver->escapeTableName($table);

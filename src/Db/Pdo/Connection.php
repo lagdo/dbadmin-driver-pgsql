@@ -3,6 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db\Pdo;
 
 use Lagdo\DbAdmin\Driver\Db\Pdo\Connection as PdoConnection;
+use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 use Lagdo\DbAdmin\Driver\PgSql\Db\ConnectionTrait;
 
 /**
@@ -44,7 +45,7 @@ class Connection extends PdoConnection
     /**
      * @inheritDoc
      */
-    public function quoteBinary(string $string)
+    public function quoteBinary(string $string): string
     {
         return $this->quote($string);
     }
@@ -52,7 +53,7 @@ class Connection extends PdoConnection
     /**
      * @inheritDoc
      */
-    public function query(string $query, bool $unbuffered = false)
+    public function query(string $query, bool $unbuffered = false): StatementInterface|bool
     {
         $result = parent::query($query, $unbuffered);
         if ($this->timeout) {
@@ -65,7 +66,7 @@ class Connection extends PdoConnection
     /**
      * @inheritDoc
      */
-    public function nextResult()
+    public function nextResult(): mixed
     {
         // PgSQL extension doesn't support multiple results
         return false;

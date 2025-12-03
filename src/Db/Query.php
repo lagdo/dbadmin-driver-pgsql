@@ -24,7 +24,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function insertOrUpdate(string $table, array $rows, array $primary)
+    public function insertOrUpdate(string $table, array $rows, array $primary): bool
     {
         foreach ($rows as $set) {
             $update = [];
@@ -51,7 +51,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function lastAutoIncrementId()
+    public function lastAutoIncrementId(): string
     {
         return '0'; // there can be several sequences
     }
@@ -59,9 +59,9 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function convertSearch(string $idf, array $val, TableFieldEntity $field)
+    public function convertSearch(string $idf, array $value, TableFieldEntity $field): string
     {
-        return (preg_match('~char|text' . (!preg_match('~LIKE~', $val["op"]) ?
+        return (preg_match('~char|text' . (!preg_match('~LIKE~', $value["op"]) ?
             '|date|time(stamp)?|boolean|uuid|' . $this->driver->numberRegex() : '') .
             '~', $field->type) ? $idf : "CAST($idf AS text)"
         );
@@ -70,7 +70,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function countRows(TableEntity $tableStatus, array $where)
+    public function countRows(TableEntity $tableStatus, array $where): int|null
     {
         $query = "EXPLAIN SELECT * FROM " . $this->driver->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");
@@ -84,7 +84,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function view(string $name)
+    public function view(string $name): array
     {
         $status = $this->driver->tableStatus($name);
         $type = strtoupper($status->engine);
@@ -102,7 +102,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function slowQuery(string $query, int $timeout)
+    public function slowQuery(string $query, int $timeout): string|null
     {
         // $this->connection->timeout = 1000 * $timeout;
         $this->driver->execute("SET statement_timeout = " . (1000 * $timeout));

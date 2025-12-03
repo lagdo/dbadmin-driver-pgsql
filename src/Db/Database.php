@@ -34,7 +34,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function createTable(TableEntity $tableAttrs)
+    public function createTable(TableEntity $tableAttrs): bool
     {
         $queries = $this->getQueries($tableAttrs);
         $columns = $this->getNewColumns($tableAttrs);
@@ -50,7 +50,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function alterTable(string $table, TableEntity $tableAttrs)
+    public function alterTable(string $table, TableEntity $tableAttrs): bool
     {
         $queries = $this->getQueries($tableAttrs);
         $columns = $this->getColumnChanges($tableAttrs);
@@ -75,7 +75,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function alterIndexes(string $table, array $alter, array $drop)
+    public function alterIndexes(string $table, array $alter, array $drop): bool
     {
         $queries = [];
         $columns = [];
@@ -112,7 +112,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function tables()
+    public function tables(): array
     {
         $query = 'SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = current_schema()';
         if ($this->driver->support('materializedview')) {
@@ -125,7 +125,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function sequences()
+    public function sequences(): array
     {
         // From db.inc.php
         $query = 'SELECT sequence_name FROM information_schema.sequences ' .
@@ -136,7 +136,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function countTables(array $databases)
+    public function countTables(array $databases): array
     {
         $counts = [];
         $query = "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('" .
@@ -158,7 +158,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function dropViews(array $views)
+    public function dropViews(array $views): bool
     {
         return $this->dropTables($views);
     }
@@ -166,7 +166,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function dropTables(array $tables)
+    public function dropTables(array $tables): bool
     {
         foreach ($tables as $table) {
             $status = $this->driver->tableStatus($table);
@@ -180,7 +180,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function schemas()
+    public function schemas(): array
     {
         $query = "SELECT nspname FROM pg_namespace WHERE nspname NOT IN ('" .
             implode("','", $this->systemSchemas) . "') ORDER BY nspname";

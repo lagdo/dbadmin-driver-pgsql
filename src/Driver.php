@@ -2,8 +2,9 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
-use Lagdo\DbAdmin\Driver\Exception\AuthException;
+use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
+use Lagdo\DbAdmin\Driver\Exception\AuthException;
 
 use function extension_loaded;
 
@@ -85,7 +86,7 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function beforeConnection()
+    protected function beforeConnection(): void
     {
         // Init config
         $this->config->jush = 'pgsql';
@@ -124,7 +125,7 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function configConnection()
+    protected function configConnection(): void
     {
         foreach ($this->userTypes(false) as $type) { //! get types from current_schemas('t')
             $name = $type->name;
@@ -162,7 +163,7 @@ class Driver extends AbstractDriver
     /**
      * @inheritDoc
      */
-    protected function connectionOpened()
+    protected function connectionOpened(): void
     {
         $this->_server()->setConnection($this->connection);
     }
@@ -171,7 +172,7 @@ class Driver extends AbstractDriver
      * @inheritDoc
      * @throws AuthException
      */
-    public function createConnection(array $options)
+    public function createConnection(array $options): ConnectionInterface|null
     {
         $preferPdo = $options['prefer_pdo'] ?? false;
         if (!$preferPdo && extension_loaded("pgsql")) {

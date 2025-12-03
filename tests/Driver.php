@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Tests;
 
+use Lagdo\DbAdmin\Driver\Db\ConnectionInterface;
 use Lagdo\DbAdmin\Driver\Fake\DriverTrait;
 use Lagdo\DbAdmin\Driver\Fake\Translator;
 use Lagdo\DbAdmin\Driver\Fake\Connection;
@@ -31,7 +32,7 @@ class Driver extends PgSqlDriver
     /**
      * @inheritDoc
      */
-    public function createConnection(array $options)
+    public function createConnection(array $options): ConnectionInterface|null
     {
         $this->testConnection = new Connection($this, $this->utils, $options, 'test');
         $this->connection = $this->testConnection;

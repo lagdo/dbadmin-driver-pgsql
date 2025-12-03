@@ -14,7 +14,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function user()
+    public function user(): string
     {
         return $this->driver->result("SELECT user");
     }
@@ -30,7 +30,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function databases(bool $flush)
+    public function databases(bool $flush): array
     {
         $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
             "AND datname not in ('postgres','template0','template1') ORDER BY datname";
@@ -40,7 +40,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function databaseSize(string $database)
+    public function databaseSize(string $database): int
     {
         $statement = $this->driver->execute("SELECT pg_database_size(" . $this->driver->quote($database) . ")");
         if (is_a($statement, StatementInterface::class) && ($row = $statement->fetchRow())) {
@@ -52,7 +52,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function databaseCollation(string $database, array $collations)
+    public function databaseCollation(string $database, array $collations): string
     {
         return $this->driver->result("SELECT datcollate FROM pg_database WHERE datname = " . $this->driver->quote($database));
     }
@@ -60,7 +60,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function collations()
+    public function collations(): array
     {
         //! supported in CREATE DATABASE
         return [];
@@ -69,7 +69,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function isInformationSchema(string $database)
+    public function isInformationSchema(string $database): bool
     {
         return $database == "information_schema";
     }
@@ -77,7 +77,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function isSystemSchema(string $database)
+    public function isSystemSchema(string $database): bool
     {
         return in_array($database, ['information_schema',
             'pg_catalog', 'pg_toast', 'postgres', 'template0', 'template1']);
@@ -86,7 +86,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function createDatabase(string $database, string $collation)
+    public function createDatabase(string $database, string $collation): bool
     {
         $result = $this->driver->execute("CREATE DATABASE " . $this->driver->escapeId($database) .
             ($collation ? " ENCODING " . $this->driver->escapeId($collation) : ""));
@@ -96,7 +96,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function dropDatabase(string $database)
+    public function dropDatabase(string $database): bool
     {
         // Cannot drop the connected database.
         if ($this->driver->database() === $database) {
@@ -109,7 +109,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function renameDatabase(string $name, string $collation)
+    public function renameDatabase(string $name, string $collation): bool
     {
         //! current database cannot be renamed
         $currName = $this->driver->escapeId($this->driver->database());
@@ -121,7 +121,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function routineLanguages()
+    public function routineLanguages(): array
     {
         return $this->driver->values("SELECT LOWER(lanname) FROM pg_catalog.pg_language");
     }
@@ -129,7 +129,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function variables()
+    public function variables(): array
     {
         return $this->driver->keyValues("SHOW ALL");
     }
@@ -137,7 +137,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function processes()
+    public function processes(): array
     {
         return $this->driver->rows("SELECT * FROM pg_stat_activity ORDER BY " . ($this->driver->minVersion(9.2) ? "pid" : "procpid"));
     }
@@ -156,14 +156,14 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function statusVariables()
+    public function statusVariables(): array
     {
     }
 
     /**
      * @inheritDoc
      */
-    // public function killProcess($val)
+    // public function killProcess($val): bool
     // {
     //     return $this->driver->execute("SELECT pg_terminate_backend(" . $this->utils->str->number($val) . ")");
     // }
@@ -171,7 +171,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    // public function maxConnections()
+    // public function maxConnections(): int
     // {
     //     return $this->driver->result("SHOW max_connections");
     // }

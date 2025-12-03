@@ -185,7 +185,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getCreateTableQuery(string $table, bool $autoIncrement, string $style)
+    public function getCreateTableQuery(string $table, bool $autoIncrement, string $style): string
     {
         $status = $this->driver->tableStatus($table);
         if ($status === null) {
@@ -216,7 +216,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getTruncateTableQuery(string $table)
+    public function getTruncateTableQuery(string $table): string
     {
         return "TRUNCATE " . $this->driver->escapeTableName($table);
     }
@@ -224,7 +224,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getCreateTriggerQuery(string $table)
+    public function getCreateTriggerQuery(string $table): string
     {
         $status = $this->driver->tableStatus($table);
         $query = "";
@@ -259,7 +259,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getUseDatabaseQuery(string $database, string $style = '')
+    public function getUseDatabaseQuery(string $database, string $style = ''): string
     {
         $name = $this->escapeId($database);
         return $this->getCreateDatabaseQuery($name, $style) . "\\connect $name;";
@@ -268,7 +268,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function queryRegex()
+    public function queryRegex(): string
     {
         return '\\s*|[\'"]|/\*|-- |$|\$[^$]*\$';
     }
