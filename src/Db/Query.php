@@ -14,7 +14,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    protected function limitToOne(string $table, string $query, string $where)
+    protected function limitToOne(string $table, string $query, string $where): string
     {
         return (preg_match('~^INTO~', $query) ? $this->driver->getLimitClause($query, $where, 1, 0) :
             " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ? $where :

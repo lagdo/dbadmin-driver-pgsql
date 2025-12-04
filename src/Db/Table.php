@@ -93,9 +93,7 @@ class Table extends AbstractTable
                 }
             }
         }
-        return array_filter($fields, function($field) {
-            return $field !== null;
-        });
+        return array_filter($fields, fn($field) => $field !== null);
     }
 
     /**
@@ -274,5 +272,6 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         if ($link) {
             return "$link-" . str_replace("_", "-", $name) . ".html";
         }
+        return '';
     }
 }

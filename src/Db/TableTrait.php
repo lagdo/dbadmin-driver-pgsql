@@ -23,7 +23,7 @@ trait TableTrait
      *
      * @return array
      */
-    private function queryStatus(string $table = '')
+    private function queryStatus(string $table = ''): array
     {
         $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
             "WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' ELSE 'table' END AS \"Engine\", " .
@@ -65,7 +65,7 @@ trait TableTrait
      *
      * @return array
      */
-    private function primaryKeyColumns(string $table)
+    private function primaryKeyColumns(string $table): array
     {
         $indexes = [];
         $table_oid = $this->driver->result("SELECT oid FROM pg_class WHERE " .
@@ -90,9 +90,9 @@ trait TableTrait
     /**
      * @param array $row
      *
-     * @return string
+     * @return mixed
      */
-    private function getFieldDefault(array $row)
+    private function getFieldDefault(array $row): mixed
     {
         $values = [
             'a' => 'GENERATED ALWAYS AS IDENTITY',
@@ -117,7 +117,7 @@ trait TableTrait
      *
      * @return array
      */
-    private function getFieldTypes(array $row)
+    private function getFieldTypes(array $row): array
     {
         $aliases = [
             'timestamp without time zone' => 'timestamp',
@@ -142,7 +142,7 @@ trait TableTrait
      *
      * @return TableFieldEntity
      */
-    private function makeFieldEntity(array $row, array $primaryKeyColumns)
+    private function makeFieldEntity(array $row, array $primaryKeyColumns): TableFieldEntity
     {
         $field = new TableFieldEntity();
 
@@ -164,7 +164,7 @@ trait TableTrait
      *
      * @return string
      */
-    private function getIndexType(array $row)
+    private function getIndexType(array $row): string
     {
         if ($row['partial']) {
             return 'INDEX';

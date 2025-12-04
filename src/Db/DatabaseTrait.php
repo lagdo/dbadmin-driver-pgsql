@@ -18,7 +18,7 @@ trait DatabaseTrait
      *
      * @return void
      */
-    private function _getRenameColumnQueries(TableEntity $tableAttrs, array &$queries)
+    private function _getRenameColumnQueries(TableEntity $tableAttrs, array &$queries): void
     {
         foreach ($tableAttrs->edited as $field) {
             $column = $this->driver->escapeId($field[0]);
@@ -40,7 +40,7 @@ trait DatabaseTrait
      *
      * @return void
      */
-    private function _getColumnCommentQueries(TableEntity $tableAttrs, array &$queries)
+    private function _getColumnCommentQueries(TableEntity $tableAttrs, array &$queries): void
     {
         foreach ($tableAttrs->fields as $field) {
             $column = $this->driver->escapeId($field[0]);
@@ -106,7 +106,7 @@ trait DatabaseTrait
      *
      * @return void
      */
-    private function _getCreateColumnQueries(TableEntity $tableAttrs, array &$columns)
+    private function _getCreateColumnQueries(TableEntity $tableAttrs, array &$columns): void
     {
         foreach ($tableAttrs->fields as $field) {
             $val = $field[1];
@@ -127,7 +127,7 @@ trait DatabaseTrait
      *
      * @return void
      */
-    private function _getAlterColumnQueries(TableEntity $tableAttrs, array &$columns)
+    private function _getAlterColumnQueries(TableEntity $tableAttrs, array &$columns): void
     {
         foreach ($tableAttrs->edited as $field) {
             $column = $this->driver->escapeId($field[0]);

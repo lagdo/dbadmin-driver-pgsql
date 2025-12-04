@@ -54,7 +54,8 @@ class Server extends AbstractServer
      */
     public function databaseCollation(string $database, array $collations): string
     {
-        return $this->driver->result("SELECT datcollate FROM pg_database WHERE datname = " . $this->driver->quote($database));
+        return $this->driver->result("SELECT datcollate FROM pg_database WHERE datname = " .
+            $this->driver->quote($database));
     }
 
     /**
@@ -139,7 +140,8 @@ class Server extends AbstractServer
      */
     public function processes(): array
     {
-        return $this->driver->rows("SELECT * FROM pg_stat_activity ORDER BY " . ($this->driver->minVersion(9.2) ? "pid" : "procpid"));
+        return $this->driver->rows("SELECT * FROM pg_stat_activity ORDER BY " .
+            ($this->driver->minVersion(9.2) ? "pid" : "procpid"));
     }
 
     /**
@@ -148,7 +150,8 @@ class Server extends AbstractServer
     public function processAttr(array $process, string $key, string $val): string
     {
         if ($key == "current_query" && $val != "<IDLE>") {
-            return '<code>' . $this->utils->str->shortenUtf8($val, 50) . '</code>' . $this->utils->trans->lang('Clone');
+            return '<code>' . $this->utils->str->shortenUtf8($val, 50) .
+                '</code>' . $this->utils->trans->lang('Clone');
         }
         return parent::processAttr($process, $key, $val);
     }
@@ -158,6 +161,7 @@ class Server extends AbstractServer
      */
     public function statusVariables(): array
     {
+        return [];
     }
 
     /**
