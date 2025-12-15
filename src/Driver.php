@@ -109,13 +109,13 @@ class Driver extends AbstractDriver
         $this->config->functions = ["char_length", "lower", "round", "to_hex", "to_timestamp", "upper"];
         $this->config->grouping = ["avg", "count", "count distinct", "max", "min", "sum"];
         $this->config->insertFunctions = [
-            "char" => "md5",
-            "date|time" => "now",
+            "char" => ["md5"],
+            "date|time" => ["now"],
         ];
         $this->config->editFunctions = [
-            $this->numberRegex() => "+/-",
-            "date|time" => "+ interval/- interval", //! escape
-            "char|text" => "||",
+            $this->numberRegex() => ["+", "-"],
+            "date|time" => ["+ interval", "- interval"], //! escape
+            "char|text" => ["||"],
         ];
         $this->config->features = ['check', 'columns', 'comment', 'database', 'drop_col', 'dump',
             'descidx', 'indexes', 'kill', 'partial_indexes', 'routine', 'scheme', 'sequence',

@@ -2,21 +2,143 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
+use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
 use Lagdo\DbAdmin\Driver\Entity\PartitionEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
 use Lagdo\DbAdmin\Driver\Db\Table as AbstractTable;
 
 use function array_filter;
 use function array_map;
+use function array_pad;
+use function explode;
 use function implode;
 use function in_array;
+use function intval;
+use function preg_match;
+use function preg_replace;
+use function preg_split;
 use function str_replace;
 
 class Table extends AbstractTable
 {
     use PgDriverTrait;
-    use TableTrait;
+    /**
+     * @param string $table
+     *
+     * @return array
+     */
+    private function queryStatus(string $table = ''): array
+    {
+        $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
+            "WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' ELSE 'table' END AS \"Engine\", " .
+            "pg_relation_size(c.oid) AS \"Data_length\", " .
+            "pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\", " .
+            "obj_description(c.oid, 'pg_class') AS \"Comment\", " .
+            ($this->driver->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
+            " AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c " .
+            "JOIN pg_namespace n ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
+            "WHERE relkind IN ('r', 'm', 'v', 'f', 'p') " .
+            ($table != "" ? "AND relname = " . $this->driver->quote($table) : "ORDER BY relname");
+        return $this->driver->rows($query);
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return TableEntity
+     */
+    private function makeStatus(array $row): TableEntity
+    {
+        $status = new TableEntity($row['Name']);
+        $status->engine = $row['Engine'];
+        $status->schema = $row['nspname'];
+        $status->dataLength = $row['Data_length'];
+        $status->indexLength = $row['Index_length'];
+        $status->oid = $row['Oid'];
+        $status->rows = $row['Rows'];
+        $status->comment = $row['Comment'];
+
+        return $status;
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return string
+     */
+    private function getIndexType(array $row): string
+    {
+        if ($row['partial']) {
+            return 'INDEX';
+        }
+        if ($row['indisprimary']) {
+            return 'PRIMARY';
+        }
+        if ($row['indisunique']) {
+            return 'UNIQUE';
+        }
+        return 'INDEX';
+    }
+
+    /**
+     * @param array $row
+     * @param array $columns
+     *
+     * @return IndexEntity
+     */
+    private function makeIndexEntity(array $row, array $columns): IndexEntity
+    {
+        $index = new IndexEntity();
+
+        $index->type = $this->getIndexType($row);
+        $index->name = $row["relname"];
+        $index->algorithm = $row["amname"];
+		$index->partial = $row["partial"];
+        $indexpr = preg_split('~(?<=\)), (?=\()~', $row["indexpr"] ?? ''); //! '), (' used in expression
+        foreach (explode(" ", $row["indkey"]) as $indkey) {
+            $index->columns[] = ($indkey ? $columns[$indkey] : array_shift($indexpr));
+        }
+        foreach (explode(" ", $row["indoption"]) as $indoption) {
+            $index->descs[] = intval($indoption) & 1 ? '1' : null; // 1 - INDOPTION_DESC
+        }
+        // $index->lengths = [];
+
+        return $index;
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return ForeignKeyEntity|null
+     */
+    private function makeForeignKeyEntity(array $row): ForeignKeyEntity|null
+    {
+        if (!preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
+            return null;
+        }
+
+        $onActions = $this->driver->actions();
+        $match = array_pad($match, 5, '');
+
+        $foreignKey = new ForeignKeyEntity();
+        $foreignKey->definition = $row['definition'];
+        $foreignKey->source = array_map('trim', explode(',', $match[1]));
+        $foreignKey->target = array_map('trim', explode(',', $match[3]));
+
+        if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match[2], $match2)) {
+            $match2 = array_pad($match2, 5, '');
+            $foreignKey->schema = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match2[2]));
+            $foreignKey->table = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match2[4]));
+        }
+
+        $foreignKey->onDelete = preg_match("~ON DELETE ($onActions)~", $match[4], $match2) ? $match2[1] : 'NO ACTION';
+        $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~", $match[4], $match2) ? $match2[1] : 'NO ACTION';
+
+        return $foreignKey;
+    }
 
     /**
      * @inheritDoc
@@ -84,16 +206,90 @@ class Table extends AbstractTable
             }
             foreach ($this->fields($tableName) as $field) {
                 if ($field->primary) {
-                    if (!isset($fields[$tableName])) {
-                        $fields[$tableName] = $field;
-                    } else {
-                        // No multi column primary key
-                        $fields[$tableName] = null;
-                    }
+                    // No multi column primary key
+                    $fields[$tableName] = !isset($fields[$tableName]) ? $field : null;
                 }
             }
         }
         return array_filter($fields, fn($field) => $field !== null);
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return array
+     */
+    private function getFieldTypes(array $row): array
+    {
+        $aliases = [
+            'timestamp without time zone' => 'timestamp',
+            'timestamp with time zone' => 'timestamptz',
+        ];
+        //! collation, primary
+        preg_match('~([^([]+)(\((.*)\))?([a-z ]+)?((\[[0-9]*])*)$~', $row["full_type"], $match);
+        // [, $type, $typeLength, $length, $addon, $array] = $match;
+        $type = $match[1] ?? '';
+        $typeLength = $match[2] ?? '';
+        $length = $match[3] ?? '';
+        $addon = $match[4] ?? '';
+        $array = $match[5] ?? '';
+
+        $checkType = "$type$addon";
+        if (isset($aliases[$checkType])) {
+            // [length, type, full type]
+            $type = $aliases[$checkType];
+            return ["{$length}{$array}", $type, "{$type}{$typeLength}{$array}"];
+        }
+
+        // [length, type, full type]
+        return ["{$length}{$array}", $type, "{$type}{$typeLength}{$addon}{$array}"];
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return array
+     */
+    private function getFieldDefault(array $row): array
+    {
+        $default = $row["default"] ?? '';
+        $attidentity = $row['attidentity'] ?? '';
+        if (in_array($attidentity, ['a', 'd'])) {
+            $default = 'GENERATED ' . ($attidentity == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
+        }
+
+        $autoIncrement = $attidentity !== '' ||
+            preg_match('~^nextval\(~i', $default) ||
+            preg_match('~^unique_rowid\(~', $default); // CockroachDB
+
+        if (preg_match('~(.+)::[^,)]+(.*)~', $default, $match)) {
+            $default = $match[1] === "NULL" ? null :
+                $this->driver->unescapeId($match[1]) . $match[2];
+        }
+
+        return [$default, $autoIncrement];
+    }
+
+    /**
+     * @param array $row
+     *
+     * @return TableFieldEntity
+     */
+    private function makeTableFieldEntity(array $row): TableFieldEntity
+    {
+        $field = new TableFieldEntity();
+
+        $field->name = $row["field"];
+        //! No collation, no info about primary keys
+        // $field->primary = false;
+        $field->null = !$row["attnotnull"];
+        [$field->length, $field->type, $field->fullType] = $this->getFieldTypes($row);
+        $field->generated = ($row["attgenerated"] ?? '') == "s" ? "STORED" : "";
+        $field->privileges = ["insert" => 1, "select" => 1, "update" => 1, "where" => 1, "order" => 1];
+        [$field->default, $field->autoIncrement] = $this->getFieldDefault($row);
+        $field->comment = $row["comment"];
+
+        return $field;
     }
 
     /**
@@ -102,22 +298,20 @@ class Table extends AbstractTable
     public function fields(string $table): array
     {
         $fields = [];
-
-        // Primary keys
-        $primaryKeyColumns = $this->primaryKeyColumns($table);
-
-        $identity_column = $this->driver->minVersion(10) ? 'a.attidentity' : '0';
-        $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type, " .
-            "pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int, " .
-            "col_description(c.oid, a.attnum) AS comment, $identity_column AS identity FROM pg_class c " .
-            "JOIN pg_namespace n ON c.relnamespace = n.oid JOIN pg_attribute a ON c.oid = a.attrelid " .
-            "LEFT JOIN pg_attrdef d ON c.oid = d.adrelid AND a.attnum = d.adnum WHERE c.relname = " .
-            $this->driver->quote($table) .
-            " AND n.nspname = current_schema() AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
+        $tableOid = $this->tableOid($table);
+        $optionalFields = ($this->driver->minVersion(10) ? ",a.attidentity" .
+            ($this->driver->minVersion(12) ? ", a.attgenerated" : "") : "");
+        $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type,
+pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int,
+col_description(a.attrelid, a.attnum) AS comment$optionalFields
+FROM pg_attribute a LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
         foreach ($this->driver->rows($query) as $row)
         {
-            $fields[$row["field"]] = $this->makeFieldEntity($row, $primaryKeyColumns);
+            $field = $this->makeTableFieldEntity($row);
+            $fields[$field->name] = $field;
         }
+
         return $fields;
     }
 
