@@ -1,8 +1,8 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db;
+namespace Lagdo\DbAdmin\Driver\PgSql\Db\Traits;
 
-trait PgDriverTrait
+trait TableOidTrait
 {
     /**
      * @var string

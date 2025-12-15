@@ -2,14 +2,14 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db\Pdo;
 
-use Lagdo\DbAdmin\Driver\Db\Pdo\Connection as PdoConnection;
+use Lagdo\DbAdmin\Driver\Db\Pdo\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\PgSql\Db\ConnectionTrait;
+use Lagdo\DbAdmin\Driver\PgSql\Db\Traits\ConnectionTrait;
 
 /**
  * PostgreSQL driver to be used with the pdo_pgsql PHP extension.
  */
-class Connection extends PdoConnection
+class Connection extends AbstractConnection
 {
     use ConnectionTrait;
 

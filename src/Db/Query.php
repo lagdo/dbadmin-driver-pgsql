@@ -2,7 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Db\Query as AbstractQuery;
+use Lagdo\DbAdmin\Driver\Db\AbstractQuery;
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 

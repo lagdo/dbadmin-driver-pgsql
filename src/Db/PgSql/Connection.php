@@ -2,11 +2,11 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
-use Lagdo\DbAdmin\Driver\Db\Connection as AbstractConnection;
+use Lagdo\DbAdmin\Driver\Db\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Db\PreparedStatement;
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\PgSql\Db\ConnectionTrait;
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
+use Lagdo\DbAdmin\Driver\PgSql\Db\Traits\ConnectionTrait;
 
 use function addcslashes;
 use function pg_affected_rows;

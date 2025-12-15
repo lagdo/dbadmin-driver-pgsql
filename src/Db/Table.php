@@ -2,13 +2,13 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
+use Lagdo\DbAdmin\Driver\Db\AbstractTable;
 use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
 use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
 use Lagdo\DbAdmin\Driver\Entity\PartitionEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
-use Lagdo\DbAdmin\Driver\Db\Table as AbstractTable;
 
 use function array_filter;
 use function array_map;
@@ -24,7 +24,8 @@ use function str_replace;
 
 class Table extends AbstractTable
 {
-    use PgDriverTrait;
+    use Traits\TableOidTrait;
+
     /**
      * @param string $table
      *

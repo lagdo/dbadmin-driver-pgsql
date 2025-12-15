@@ -2,8 +2,8 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql;
 
-use Lagdo\DbAdmin\Driver\Db\Connection;
-use Lagdo\DbAdmin\Driver\Driver as AbstractDriver;
+use Lagdo\DbAdmin\Driver\AbstractDriver;
+use Lagdo\DbAdmin\Driver\Db\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 
 use function extension_loaded;
@@ -36,7 +36,7 @@ class Driver extends AbstractDriver
     private Db\Grammar|null $grammar = null;
 
     /**
-     * @var Db\Server
+     * @return Db\Server
      */
     protected function _server(): Db\Server
     {
@@ -44,7 +44,7 @@ class Driver extends AbstractDriver
     }
 
     /**
-     * @var Db\Database
+     * @return Db\Database
      */
     protected function _database(): Db\Database
     {
@@ -52,7 +52,7 @@ class Driver extends AbstractDriver
     }
 
     /**
-     * @var Db\Table
+     * @return Db\Table
      */
     protected function _table(): Db\Table
     {
@@ -60,7 +60,7 @@ class Driver extends AbstractDriver
     }
 
     /**
-     * @var Db\Grammar
+     * @return Db\Grammar
      */
     protected function _grammar(): Db\Grammar
     {
@@ -68,7 +68,7 @@ class Driver extends AbstractDriver
     }
 
     /**
-     * @var Db\Query
+     * @return Db\Query
      */
     protected function _query(): Db\Query
     {
@@ -172,7 +172,7 @@ class Driver extends AbstractDriver
      * @inheritDoc
      * @throws AuthException
      */
-    public function createConnection(array $options): Connection|null
+    public function createConnection(array $options): AbstractConnection|null
     {
         $preferPdo = $options['prefer_pdo'] ?? false;
         if (!$preferPdo && extension_loaded("pgsql")) {

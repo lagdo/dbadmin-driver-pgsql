@@ -2,7 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Db\Server as AbstractServer;
+use Lagdo\DbAdmin\Driver\Db\AbstractServer;
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 
 use function in_array;

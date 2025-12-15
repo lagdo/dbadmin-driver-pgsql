@@ -2,7 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
-use Lagdo\DbAdmin\Driver\Db\Grammar as AbstractGrammar;
+use Lagdo\DbAdmin\Driver\Db\AbstractGrammar;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 
 use function array_map;

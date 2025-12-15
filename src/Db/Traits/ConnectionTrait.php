@@ -1,6 +1,6 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db;
+namespace Lagdo\DbAdmin\Driver\PgSql\Db\Traits;
 
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 
