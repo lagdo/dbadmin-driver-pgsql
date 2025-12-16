@@ -4,7 +4,10 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db\Traits;
 
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 
+use function array_pad;
+use function preg_match;
 use function preg_replace;
+use function strlen;
 
 trait ConnectionTrait
 {

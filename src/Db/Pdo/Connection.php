@@ -32,7 +32,11 @@ class Connection extends AbstractConnection
         }
 
         //! client_encoding is supported since 9.1 but we can't yet use min_version here
-        $this->dsn("pgsql:host='$server' client_encoding=utf8 dbname='$database'", $username, $password);
+        $dsn = "pgsql:host='$server' client_encoding=utf8 dbname='$database'";
+        if (!$this->dsn($dsn, $username, $password)) {
+            return false;
+        }
+
         if ($this->driver->minVersion(9, 0)) {
             $this->query("SET application_name = 'Jaxon DbAdmin'");
         }

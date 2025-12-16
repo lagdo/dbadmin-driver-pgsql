@@ -52,8 +52,9 @@ class Connection extends AbstractConnection
         $password = addcslashes($this->options['password'], "'\\");
         $database = !$database ? 'postgres' : addcslashes($database, "'\\");
 
-        $connString = "host='$server' user='$username' password='$password' dbname='$database'";
-        $this->client = pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
+        $connString = "host='$server' user='$username' password='$password' " .
+            "dbname='$database' connect_timeout=2";
+        $this->client = @pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
         // if (!$this->client && $database != "") {
         //     // try to connect directly with database for performance
         //     $this->_database = false;
