@@ -7,8 +7,10 @@ use Lagdo\DbAdmin\Driver\Entity\FieldType;
 use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
 use Lagdo\DbAdmin\Driver\Entity\RoutineInfoEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\UserTypeEntity;
 
+use function array_filter;
 use function array_map;
 use function array_merge;
 use function array_reverse;
@@ -253,14 +255,17 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function userTypes(bool $withEnums): array
+    public function userTypes(bool $withValues): array
     {
         $query = "SELECT oid, typname AS name FROM pg_type
 WHERE typnamespace = {$this->nsOid} AND typtype IN ('b','d','e') AND typelem = 0";
-        $callback = fn($type) => new UserTypeEntity($type['oid'], $type['name']);
-        $types = array_map($callback, $this->driver->rows($query));
+        $rows = $this->driver->rows($query);
+        $types = [];
+        foreach ($rows as $row) {
+            $types[$row['name']] = new UserTypeEntity($row['oid'], $row['name']);
+        }
 
-        if (!$withEnums || count($types) === 0) {
+        if (!$withValues || count($types) === 0) {
             return $types;
         }
 
@@ -268,13 +273,24 @@ WHERE typnamespace = {$this->nsOid} AND typtype IN ('b','d','e') AND typelem = 0
         $query = "SELECT enumtypid, enumlabel FROM pg_enum
 WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
         foreach ($this->driver->rows($query) as $enum) {
-            foreach ($types as $type) {
+            foreach ($types as &$type) {
                 if ($type->oid === $enum['enumtypid']) {
                     $type->enums[] = $enum['enumlabel'];
+                    break;
                 }
             }
         }
         return $types;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function enumValues(TableFieldEntity $field): array
+    {
+        $types = array_filter($this->userTypes(true),
+            fn(UserTypeEntity $type) => $type->name === $field->type);
+        return isset($types[0]) ? $types[0]->enums : [];
     }
 
     /**
@@ -445,9 +461,8 @@ WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
      */
     public function truncateTables(array $tables): bool
     {
-        $this->driver->execute('TRUNCATE ' . implode(', ', array_map(function ($table) {
-            return $this->driver->escapeTableName($table);
-        }, $tables)));
+        $tables = array_map(fn($table) => $this->driver->escapeTableName($table), $tables);
+        $this->driver->execute('TRUNCATE ' . implode(', ', $tables));
         return true;
     }
 }

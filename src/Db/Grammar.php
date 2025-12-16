@@ -264,12 +264,4 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         $name = $this->escapeId($database);
         return $this->getCreateDatabaseQuery($name, $style) . "\\connect $name;";
     }
-
-    /**
-     * @inheritDoc
-     */
-    public function queryRegex(): string
-    {
-        return '\\s*|[\'"]|/\*|-- |$|\$[^$]*\$';
-    }
 }
