@@ -15,6 +15,7 @@ use function array_map;
 use function array_merge;
 use function array_reverse;
 use function array_unshift;
+use function array_values;
 use function count;
 use function implode;
 use function is_object;
@@ -288,7 +289,7 @@ WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
      */
     public function enumValues(TableFieldEntity $field): array
     {
-        $types = array_filter($this->userTypes(true),
+        $types = array_filter(array_values($this->userTypes(true)),
             fn(UserTypeEntity $type) => $type->name === $field->type);
         return isset($types[0]) ? $types[0]->enums : [];
     }
