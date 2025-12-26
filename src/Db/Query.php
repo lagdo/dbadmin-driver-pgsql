@@ -6,20 +6,13 @@ use Lagdo\DbAdmin\Driver\Db\AbstractQuery;
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 
+use function array_keys;
+use function implode;
+use function preg_match;
 use function strtoupper;
 
 class Query extends AbstractQuery
 {
-    /**
-     * @inheritDoc
-     */
-    protected function limitToOne(string $table, string $query, string $where): string
-    {
-        return (preg_match('~^INTO~', $query) ? $this->driver->getLimitClause($query, $where, 1, 0) :
-            " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ? $where :
-            " WHERE ctid = (SELECT ctid FROM " . $this->driver->escapeTableName($table) . $where . ' LIMIT 1)'));
-    }
-
     /**
      * @inheritDoc
      */
@@ -60,10 +53,10 @@ class Query extends AbstractQuery
      */
     public function convertSearch(string $idf, array $value, TableFieldEntity $field): string
     {
-        return (preg_match('~char|text' . (!preg_match('~LIKE~', $value["op"]) ?
-            '|date|time(stamp)?|boolean|uuid|' . $this->driver->numberRegex() : '') .
-            '~', $field->type) ? $idf : "CAST($idf AS text)"
-        );
+        return preg_match('~char|text' .
+            (!preg_match('~LIKE~', $value["op"]) ?
+                '|date|time(stamp)?|boolean|uuid|' . $this->driver->numberRegex() : '') .
+            '~', $field->type) ? $idf : "CAST($idf AS text)";
     }
 
     /**

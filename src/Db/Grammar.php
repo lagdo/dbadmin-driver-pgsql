@@ -36,6 +36,18 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
+    protected function limitToOne(string $table, string $query, string $where): string
+    {
+        return preg_match('~^INTO~', $query) ?
+            $this->getLimitClause($query, $where, 1, 0) :
+            " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ?
+                $where : " WHERE ctid = (SELECT ctid FROM " .
+                    $this->escapeTableName($table) . $where . ' LIMIT 1)');
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function getForeignKeysQueries(TableEntity $table): array
     {
         $queries = [];
