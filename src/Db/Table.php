@@ -283,7 +283,7 @@ class Table extends AbstractTable
         $field->name = $row["field"];
         //! No collation, no info about primary keys
         // $field->primary = false;
-        $field->null = !$row["attnotnull"];
+        $field->nullable = !$row["attnotnull"];
         [$field->length, $field->type, $field->fullType] = $this->getFieldTypes($row);
         $field->generated = ($row["attgenerated"] ?? '') == "s" ? "STORED" : "";
         $field->privileges = ["insert" => 1, "select" => 1, "update" => 1, "where" => 1, "order" => 1];
