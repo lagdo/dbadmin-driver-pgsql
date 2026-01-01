@@ -6,6 +6,8 @@ use Lagdo\DbAdmin\Driver\AbstractDriver;
 use Lagdo\DbAdmin\Driver\Db\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 
+use function array_map;
+use function count;
 use function extension_loaded;
 
 class Driver extends AbstractDriver
@@ -88,20 +90,21 @@ class Driver extends AbstractDriver
      */
     protected function beforeConnection(): void
     {
+        $trans = $this->utils->trans;
         // Init config
         $this->config->jush = 'pgsql';
         $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
-        $this->config->setTypes([ //! arrays
-            'Numbers' => ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1,
+        $this->config->types = [ //! arrays
+            $trans->lang('Numbers') => ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1,
                 "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
-            'Date and time' => ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
-            'Strings' => ["character" => 0, "character varying" => 0, "text" => 0,
+            $trans->lang('Date and time') => ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
+            $trans->lang('Strings') => ["character" => 0, "character varying" => 0, "text" => 0,
                 "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
-            'Binary' => ["bit" => 0, "bit varying" => 0, "bytea" => 0],
-            'Network' => ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
-            'Geometry' => ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0,
+            $trans->lang('Binary') => ["bit" => 0, "bit varying" => 0, "bytea" => 0],
+            $trans->lang('Network') => ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
+            $trans->lang('Geometry') => ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0,
                 "path" => 0, "point" => 0, "polygon" => 0],
-        ]);
+        ];
         // $this->config->unsigned = [];
         $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE",
             "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT ILIKE",
@@ -130,18 +133,17 @@ class Driver extends AbstractDriver
      */
     protected function configConnection(): void
     {
-        foreach ($this->userTypes(false) as $type) { //! get types from current_schemas('t')
-            $name = $type->name;
-            if (!isset($this->config->types[$name])) {
-                $this->config->types[$name] = 0;
-                $this->config->structuredTypes[$this->utils->trans->lang('User types')][] = $name;
-            }
+        $trans = $this->utils->trans;
+        //! get types from current_schemas('t')
+        $userTypes = array_map(fn($type) => (int)$type->oid, $this->userTypes(false));
+        if (count($userTypes) > 0) {
+            $this->config->types[$trans->lang('User types')] = $userTypes;
         }
 
         if ($this->minVersion(9.2, 0)) {
-            $this->config->setTypes(['Strings' => ["json" => 4294967295]]);
+            $this->config->types[$trans->lang('Strings')]["json"] = 4294967295;
             if ($this->minVersion(9.4, 0)) {
-                $this->config->setTypes(['Strings' => ["jsonb" => 4294967295]]);
+                $this->config->types[$trans->lang('Strings')]["jsonb"] = 4294967295;
             }
         }
         if ($this->minVersion(12, 0)) {
