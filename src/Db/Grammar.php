@@ -28,6 +28,14 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
+    public function getAutoIncrementModifier(): string
+    {
+        return '';
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function escapeId(string $idf): string
     {
         return '"' . str_replace('"', '""', $idf) . '"';
@@ -197,7 +205,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getCreateTableQuery(string $table, bool $autoIncrement, string $style): string
+    public function getTableDefinitionQueries(string $table, bool $autoIncrement, string $style): string
     {
         $status = $this->driver->tableStatus($table);
         if ($status === null) {
@@ -228,7 +236,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getTruncateTableQuery(string $table): string
+    public function getTableTruncationQuery(string $table): string
     {
         return "TRUNCATE " . $this->driver->escapeTableName($table);
     }
@@ -236,7 +244,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getCreateTriggerQuery(string $table): string
+    public function getTriggerCreationQuery(string $table): string
     {
         $status = $this->driver->tableStatus($table);
         $query = "";
