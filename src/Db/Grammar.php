@@ -3,9 +3,14 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\AbstractGrammar;
+use Lagdo\DbAdmin\Driver\Entity\ColumnEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableAlterEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableCreateEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 
 use function array_map;
+use function count;
 use function implode;
 use function is_string;
 use function ksort;
@@ -54,6 +59,181 @@ class Grammar extends AbstractGrammar
     }
 
     /**
+     * @param string $tableName
+     * @param array<ColumnEntity> $columns
+     *
+     * @return array<string>
+     */
+    private function getColumnRenameQueries(string $tableName, array $columns): array
+    {
+        $queries = [];
+        foreach ($columns as $fieldName => $column) {
+            if ($fieldName !== $column->field->name) {
+                $fieldName = $this->escapeId($fieldName);
+                $queries[] = "ALTER TABLE $tableName RENAME $fieldName TO {$column->name}";
+            }
+        }
+        return $queries;
+    }
+
+    /**
+     * @param string $tableName
+     * @param string $tableComment
+     * @param array<ColumnEntity> $columns
+     *
+     * @return array<string>
+     */
+    private function getTableCommentQueries(string $tableName, string $tableComment, array $columns): array
+    {
+        $queries = [];
+        foreach ($columns as $column) {
+            if ($column->comment !== '') {
+                $comment = substr($column->comment, 9);
+                $queries[] = "COMMENT ON COLUMN $tableName.{$column->name} IS '$comment'";
+            }
+        }
+        if ($tableComment !== '') {
+            $queries[] = "COMMENT ON TABLE {$tableName} IS " . $this->driver->quote($tableComment);
+        }
+        return $queries;
+    }
+
+    /**
+     * @param string $tableName
+     * @param ColumnEntity $column
+     *
+     * @return string
+     */
+    private function getChangedColumnValue(string $tableName, ColumnEntity $column): string
+    {
+        if ($column->defaultValue) {
+            $pattern = '~GENERATED ALWAYS(.*) STORED~';
+            return "SET" . preg_replace($pattern, 'EXPRESSION\1', $column->defaultValue);
+        }
+
+        $sequenceName = "{$tableName}_{$column->field->name}_seq";
+        return $column->autoIncrement ?
+            "SET DEFAULT nextval(" . $this->driver->quote($sequenceName) . ")" :
+            "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
+    }
+
+    /**
+     * @param TableAlterEntity $table
+     *
+     * @return array<string>
+     */
+    private function getTableSequenceQuery(TableAlterEntity $table): array
+    {
+        foreach ($table->changedColumns as $column) {
+            if ($column->autoIncrement) {
+                $sequenceName = "{$table->name}_{$column->field->name}_seq";
+                $tableName = $this->driver->escapeTableName($table->name);
+                return [
+                    "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.{$column->name}",
+                ];
+            }
+        }
+        return [];
+    }
+
+    /**
+     * @param TableAlterEntity $table
+     *
+     * @return array<string>
+     */
+    private function getChangedColumnClauses(TableAlterEntity $table): array
+    {
+        $clauses = [];
+        foreach ($table->changedColumns as $fieldName => $column) {
+            $fieldName =  $this->escapeId($fieldName);
+            $clauses[] = "ALTER $fieldName TYPE {$column->type}";
+            $clauses[] = "ALTER $fieldName " .
+                $this->getChangedColumnValue($table->name, $column);
+            $clauses[] = "ALTER $fieldName " .
+                ($column->field->nullable ? 'DROP NOT NULL' : 'SET NOT NULL');
+        }
+        return $clauses;
+    }
+
+    /**
+     * @param array<ColumnEntity> $columns
+     * @param string $prefix
+     *
+     * @return array<string>
+     */
+    private function getAddedColumnClauses(array $columns, string $prefix = ''): array
+    {
+        $clauses = [];
+        foreach ($columns as $column) {
+            if ($column->autoIncrement !== null) { // auto increment
+                $column->type = match($column->type) {
+                    ' bigint' => ' bigserial',
+                    ' smallint' => ' smallserial',
+                    default => ' serial',
+                };
+            }
+            $clauses[] = $prefix . $column->clause();
+            if ($column->autoIncrement !== null) {
+                $clauses[] = "{$prefix}PRIMARY KEY ({$column->name})";
+            }
+        }
+        return $clauses;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getTableCreationQueries(TableCreateEntity $table): array
+    {
+        $tableName = $this->driver->escapeTableName($table->name);
+        // Tables columns
+        $columns = [
+            ...$this->getAddedColumnClauses($table->columns),
+            ...$this->getForeignKeyClauses($table, 'ADD '),
+        ];
+
+        return [
+            "CREATE TABLE $tableName" . '(' . implode(', ', $columns) . ')',
+            ...$this->getTableCommentQueries($tableName, $table->comment, $table->columns),
+        ];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getTableAlterationQueries(TableAlterEntity $table): array
+    {
+        $tableName = $this->driver->escapeTableName($table->name);
+        $renameTableQuery = [];
+        if ($table->name !== $table->current->name) {
+            $currTableName = $this->driver->escapeTableName($table->current->name);
+            $renameTableQuery[] = "ALTER TABLE $currTableName RENAME TO $tableName";
+        }
+
+        $droppedColumnClauses = array_map(fn($fieldName) =>
+            'DROP ' .  $this->escapeId($fieldName), $table->droppedColumns);
+        $clauses =  [
+            ...$this->getAddedColumnClauses($table->addedColumns, 'ADD '),
+            ...$this->getChangedColumnClauses($table),
+            ...$droppedColumnClauses,
+            ...$this->getForeignKeyClauses($table, 'ADD '),
+        ];
+        $alterTableQuery = count($clauses) === 0 ? [] :
+            ["ALTER TABLE $tableName " . implode(', ', $clauses)];
+
+        return [
+            ...$this->getTableSequenceQuery($table),
+            ...$renameTableQuery,
+            ...$alterTableQuery,
+            ...$this->getColumnRenameQueries($tableName, $table->changedColumns),
+            ...$this->getTableCommentQueries($tableName, $table->comment, [
+                ...$table->addedColumns,
+                ...$table->changedColumns,
+            ]),
+        ];
+    }
+
+    /**
      * @inheritDoc
      */
     public function getForeignKeysQueries(TableEntity $table): array
@@ -74,7 +254,7 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @param array $fields
+     * @param array<TableFieldEntity> $fields
      * @param boolean $autoIncrement
      * @param string $style
      *
@@ -168,7 +348,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         // Fields definitions
         foreach ($fields as $field) {
             $clauses[] = $this->escapeId($field->name) . ' ' . $field->fullType .
-                $this->driver->getDefaultValueClause($field) . ($field->null ? "" : " NOT NULL");
+                $this->getDefaultValueClause($field) . ($field->nullable ? "" : " NOT NULL");
         }
 
         $indexes = $this->driver->indexes($table);

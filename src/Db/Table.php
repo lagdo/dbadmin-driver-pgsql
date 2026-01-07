@@ -196,26 +196,6 @@ class Table extends AbstractTable
     }
 
     /**
-     * @inheritDoc
-     */
-    public function referencableTables(string $table): array
-    {
-        $fields = []; // table_name => [field]
-        foreach ($this->tableNames() as $tableName) {
-            if ($tableName === $table) {
-                continue;
-            }
-            foreach ($this->fields($tableName) as $field) {
-                if ($field->primary) {
-                    // No multi column primary key
-                    $fields[$tableName] = !isset($fields[$tableName]) ? $field : null;
-                }
-            }
-        }
-        return array_filter($fields, fn($field) => $field !== null);
-    }
-
-    /**
      * @param array $row
      *
      * @return array

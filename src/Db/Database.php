@@ -6,7 +6,6 @@ use Lagdo\DbAdmin\Driver\Db\AbstractDatabase;
 use Lagdo\DbAdmin\Driver\Entity\FieldType;
 use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
 use Lagdo\DbAdmin\Driver\Entity\RoutineInfoEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\UserTypeEntity;
 
@@ -20,7 +19,6 @@ use function count;
 use function implode;
 use function is_object;
 use function strtoupper;
-use function substr;
 use function uniqid;
 
 class Database extends AbstractDatabase
@@ -33,47 +31,6 @@ class Database extends AbstractDatabase
      * @var array
      */
     protected $systemSchemas = ['information_schema', 'pg_catalog', 'pg_temp_1', 'pg_toast', 'pg_toast_temp_1'];
-
-    /**
-     * @inheritDoc
-     */
-    public function createTable(TableEntity $tableAttrs): bool
-    {
-        $queries = $this->getQueries($tableAttrs);
-        $columns = $this->getNewColumns($tableAttrs);
-        $columns = array_merge($columns, $tableAttrs->foreign);
-        array_unshift($queries, 'CREATE TABLE ' . $this->driver->escapeTableName($tableAttrs->name) .
-            '(' . implode(', ', $columns) . ')');
-        foreach ($queries as $query) {
-            $this->driver->execute($query);
-        }
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function alterTable(string $table, TableEntity $tableAttrs): bool
-    {
-        $queries = $this->getQueries($tableAttrs);
-        $columns = $this->getColumnChanges($tableAttrs);
-        if ($tableAttrs->name !== '' && $table !== $tableAttrs->name) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) .
-                ' RENAME TO ' . $this->driver->escapeTableName($tableAttrs->name));
-        }
-        $columns = array_merge($columns, $tableAttrs->foreign);
-        if (!empty($columns)) {
-            array_unshift($queries, 'ALTER TABLE ' . $this->driver->escapeTableName($table) .
-                ' ' . implode(', ', $columns));
-        }
-        // if ($tableAttrs->autoIncrement != '') {
-        //     //! $queries[] = 'SELECT setval(pg_get_serial_sequence(' . $this->driver->quote($tableAttrs->name) . ', ), $tableAttrs->autoIncrement)';
-        // }
-        foreach ($queries as $query) {
-            $this->driver->execute($query);
-        }
-        return true;
-    }
 
     /**
      * @inheritDoc
@@ -292,154 +249,6 @@ WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
         $types = array_filter(array_values($this->userTypes(true)),
             fn(UserTypeEntity $type) => $type->name === $field->type);
         return isset($types[0]) ? $types[0]->enums : [];
-    }
-
-    /**
-     * @param TableEntity $tableAttrs
-     * @param array $queries
-     *
-     * @return void
-     */
-    private function _getRenameColumnQueries(TableEntity $tableAttrs, array &$queries): void
-    {
-        foreach ($tableAttrs->edited as $field) {
-            $column = $this->driver->escapeId($field[0]);
-            $val = $field[1];
-            $val5 = $val[5] ?? '';
-            if ($val[0] !== '' && $column !== $val[0]) {
-                $queries[] = 'ALTER TABLE ' . $this->driver->escapeTableName($tableAttrs->name) . " RENAME $column TO $val[0]";
-            }
-            if ($column !== '' || $val5 !== '') {
-                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->escapeTableName($tableAttrs->name) .
-                    ".$val[0] IS " . ($val5 !== '' ? substr($val5, 9) : "''");
-            }
-        }
-    }
-
-    /**
-     * @param TableEntity $tableAttrs
-     * @param array $queries
-     *
-     * @return void
-     */
-    private function _getColumnCommentQueries(TableEntity $tableAttrs, array &$queries): void
-    {
-        foreach ($tableAttrs->fields as $field) {
-            $column = $this->driver->escapeId($field[0]);
-            $val = $field[1];
-            $val5 = $val[5] ?? '';
-            if ($column !== '' || $val5 !== '') {
-                $queries[] = 'COMMENT ON COLUMN ' . $this->driver->escapeTableName($tableAttrs->name) .
-                    ".$val[0] IS " . ($val5 !== '' ? substr($val5, 9) : "''");
-            }
-        }
-    }
-
-    /**
-     * Get queries to create or alter table.
-     *
-     * @param TableEntity $tableAttrs
-     *
-     * @return array
-     */
-    private function getQueries(TableEntity $tableAttrs): array
-    {
-        $queries = [];
-
-        $this->_getRenameColumnQueries($tableAttrs, $queries);
-        $this->_getColumnCommentQueries($tableAttrs, $queries);
-        if ($tableAttrs->comment !== '') {
-            $queries[] = 'COMMENT ON TABLE ' . $this->driver->escapeTableName($tableAttrs->name) .
-                ' IS ' . $this->driver->quote($tableAttrs->comment);
-        }
-
-        return $queries;
-    }
-
-    /**
-     * Get queries to create or alter table.
-     *
-     * @param TableEntity $tableAttrs
-     *
-     * @return array
-     */
-    private function getNewColumns(TableEntity $tableAttrs): array
-    {
-        $columns = [];
-
-        foreach ($tableAttrs->fields as $field) {
-            $val = $field[1];
-            if (isset($val[6])) { // auto increment
-                // Todo: use match
-                $val[1] = ($val[1] === ' bigint' ? ' big' : ($val[1] === ' smallint' ? ' small' : ' ')) . 'serial';
-            }
-            $columns[] = implode($val);
-            if (isset($val[6])) {
-                $columns[] = " PRIMARY KEY ($val[0])";
-            }
-        }
-
-        return $columns;
-    }
-
-    /**
-     * @param TableEntity $tableAttrs
-     * @param array $columns
-     *
-     * @return void
-     */
-    private function _getCreateColumnQueries(TableEntity $tableAttrs, array &$columns): void
-    {
-        foreach ($tableAttrs->fields as $field) {
-            $val = $field[1];
-            if (isset($val[6])) { // auto increment
-                // Todo: use match
-                $val[1] = ($val[1] === ' bigint' ? ' big' : ($val[1] === ' smallint' ? ' small' : ' ')) . 'serial';
-            }
-            $columns[] = 'ADD ' . implode($val);
-            if (isset($val[6])) {
-                $columns[] = "ADD PRIMARY KEY ($val[0])";
-            }
-        }
-    }
-
-    /**
-     * @param TableEntity $tableAttrs
-     * @param array $columns
-     *
-     * @return void
-     */
-    private function _getAlterColumnQueries(TableEntity $tableAttrs, array &$columns): void
-    {
-        foreach ($tableAttrs->edited as $field) {
-            $column = $this->driver->escapeId($field[0]);
-            $val = $field[1];
-            $columns[] = "ALTER $column TYPE$val[1]";
-            if (!$val[6]) {
-                $columns[] = "ALTER $column " . ($val[3] ? "SET$val[3]" : 'DROP DEFAULT');
-                $columns[] = "ALTER $column " . ($val[2] === ' NULL' ? 'DROP NOT' : 'SET') . $val[2];
-            }
-        }
-    }
-
-    /**
-     * Get queries to create or alter table.
-     *
-     * @param TableEntity $tableAttrs
-     *
-     * @return array
-     */
-    private function getColumnChanges(TableEntity $tableAttrs): array
-    {
-        $columns = [];
-
-        $this->_getCreateColumnQueries($tableAttrs, $columns);
-        $this->_getAlterColumnQueries($tableAttrs, $columns);
-        foreach ($tableAttrs->dropped as $column) {
-            $columns[] = 'DROP ' . $this->driver->escapeId($column);
-        }
-
-        return $columns;
     }
 
     /**
