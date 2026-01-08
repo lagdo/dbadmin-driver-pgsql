@@ -146,7 +146,7 @@ class Grammar extends AbstractGrammar
         $clauses = [];
         foreach ($table->changedColumns as $fieldName => $column) {
             $fieldName =  $this->escapeId($fieldName);
-            $clauses[] = "ALTER $fieldName TYPE {$column->type}";
+            $clauses[] = "ALTER $fieldName TYPE{$column->type}";
             $clauses[] = "ALTER $fieldName " .
                 $this->getChangedColumnValue($table->name, $column);
             $clauses[] = "ALTER $fieldName " .
