@@ -16,6 +16,7 @@
         "source": "https://github.com/lagdo/dbadmin-driver-pgsql"
     },
     "require": {
+        "php": ">=8.1.0",
         "lagdo/dbadmin-driver": "0.20.*"
     },
     "require-dev": {
