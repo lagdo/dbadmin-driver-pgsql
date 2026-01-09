@@ -10,7 +10,6 @@ use Lagdo\DbAdmin\Driver\Entity\TableEntity;
 use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
 use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
 
-use function array_filter;
 use function array_map;
 use function array_pad;
 use function explode;
@@ -233,19 +232,18 @@ class Table extends AbstractTable
      */
     private function getFieldDefault(array $row): array
     {
-        $default = $row["default"] ?? '';
+        $default = $row["default"] ?? null;
         $attidentity = $row['attidentity'] ?? '';
         if (in_array($attidentity, ['a', 'd'])) {
             $default = 'GENERATED ' . ($attidentity == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
         }
 
-        $autoIncrement = $attidentity !== '' ||
-            preg_match('~^nextval\(~i', $default) ||
-            preg_match('~^unique_rowid\(~', $default); // CockroachDB
+        $autoIncrement = $attidentity !== '' || $default !== null &&
+            (preg_match('~^nextval\(~i', $default) ||
+            preg_match('~^unique_rowid\(~', $default)); // CockroachDB
 
-        if (preg_match('~(.+)::[^,)]+(.*)~', $default, $match)) {
-            $default = $match[1] === "NULL" ? null :
-                $this->driver->unescapeId($match[1]) . $match[2];
+        if ($default !== null && preg_match('~(.+)::[^,)]+(.*)~', $default, $match)) {
+            $default = $match[1] === "NULL" ? null : $this->driver->unescapeId($match[1]) . $match[2];
         }
 
         return [$default, $autoIncrement];
