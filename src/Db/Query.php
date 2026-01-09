@@ -3,8 +3,8 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\AbstractQuery;
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
+use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\Dto\TableDto;
 
 use function array_keys;
 use function implode;
@@ -51,7 +51,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function convertSearch(string $idf, array $value, TableFieldEntity $field): string
+    public function convertSearch(string $idf, array $value, TableFieldDto $field): string
     {
         return preg_match('~char|text' .
             (!preg_match('~LIKE~', $value["op"]) ?
@@ -62,7 +62,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function countRows(TableEntity $tableStatus, array $where): int|null
+    public function countRows(TableDto $tableStatus, array $where): int|null
     {
         $query = "EXPLAIN SELECT * FROM " . $this->driver->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");

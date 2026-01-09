@@ -3,12 +3,12 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\AbstractTable;
-use Lagdo\DbAdmin\Driver\Entity\ForeignKeyEntity;
-use Lagdo\DbAdmin\Driver\Entity\IndexEntity;
-use Lagdo\DbAdmin\Driver\Entity\PartitionEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
-use Lagdo\DbAdmin\Driver\Entity\TriggerEntity;
+use Lagdo\DbAdmin\Driver\Dto\ForeignKeyDto;
+use Lagdo\DbAdmin\Driver\Dto\IndexDto;
+use Lagdo\DbAdmin\Driver\Dto\PartitionDto;
+use Lagdo\DbAdmin\Driver\Dto\TableDto;
+use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\Dto\TriggerDto;
 
 use function array_map;
 use function array_pad;
@@ -48,11 +48,11 @@ class Table extends AbstractTable
     /**
      * @param array $row
      *
-     * @return TableEntity
+     * @return TableDto
      */
-    private function makeStatus(array $row): TableEntity
+    private function makeStatus(array $row): TableDto
     {
-        $status = new TableEntity($row['Name']);
+        $status = new TableDto($row['Name']);
         $status->engine = $row['Engine'];
         $status->schema = $row['nspname'];
         $status->dataLength = $row['Data_length'];
@@ -87,11 +87,11 @@ class Table extends AbstractTable
      * @param array $row
      * @param array $columns
      *
-     * @return IndexEntity
+     * @return IndexDto
      */
-    private function makeIndexEntity(array $row, array $columns): IndexEntity
+    private function makeIndexDto(array $row, array $columns): IndexDto
     {
-        $index = new IndexEntity();
+        $index = new IndexDto();
 
         $index->type = $this->getIndexType($row);
         $index->name = $row["relname"];
@@ -112,9 +112,9 @@ class Table extends AbstractTable
     /**
      * @param array $row
      *
-     * @return ForeignKeyEntity|null
+     * @return ForeignKeyDto|null
      */
-    private function makeForeignKeyEntity(array $row): ForeignKeyEntity|null
+    private function makeForeignKeyDto(array $row): ForeignKeyDto|null
     {
         if (!preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
             return null;
@@ -123,7 +123,7 @@ class Table extends AbstractTable
         $onActions = $this->driver->actions();
         $match = array_pad($match, 5, '');
 
-        $foreignKey = new ForeignKeyEntity();
+        $foreignKey = new ForeignKeyDto();
         $foreignKey->definition = $row['definition'];
         $foreignKey->source = array_map('trim', explode(',', $match[1]));
         $foreignKey->target = array_map('trim', explode(',', $match[3]));
@@ -143,7 +143,7 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function tableStatus(string $table, bool $fast = false): TableEntity|null
+    public function tableStatus(string $table, bool $fast = false): TableDto|null
     {
         $rows = $this->queryStatus($table);
         if (!($row = reset($rows))) {
@@ -181,7 +181,7 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function isView(TableEntity $tableStatus): bool
+    public function isView(TableDto $tableStatus): bool
     {
         return in_array($tableStatus->engine, ["view", "materialized view"]);
     }
@@ -189,7 +189,7 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    public function supportForeignKeys(TableEntity $tableStatus): bool
+    public function supportForeignKeys(TableDto $tableStatus): bool
     {
         return true;
     }
@@ -252,11 +252,11 @@ class Table extends AbstractTable
     /**
      * @param array $row
      *
-     * @return TableFieldEntity
+     * @return TableFieldDto
      */
-    private function makeTableFieldEntity(array $row): TableFieldEntity
+    private function makeTableFieldDto(array $row): TableFieldDto
     {
-        $field = new TableFieldEntity();
+        $field = new TableFieldDto();
 
         $field->name = $row["field"];
         //! No collation, no info about primary keys
@@ -287,7 +287,7 @@ FROM pg_attribute a LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnu
 WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
         foreach ($this->driver->rows($query) as $row)
         {
-            $field = $this->makeTableFieldEntity($row);
+            $field = $this->makeTableFieldDto($row);
             $fields[$field->name] = $field;
         }
 
@@ -310,7 +310,7 @@ WHERE indrelid = $tableOid ORDER BY indisprimary DESC, indisunique DESC";
         $indexes = [];
         foreach ($this->driver->rows($query) as $row)
         {
-            $indexes[$row["relname"]] = $this->makeIndexEntity($row, $columns);
+            $indexes[$row["relname"]] = $this->makeIndexDto($row, $columns);
         }
         return $indexes;
     }
@@ -327,7 +327,7 @@ AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class A
 INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = $table
 AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conname";
         foreach ($this->driver->rows($query) as $row) {
-            $foreignKey = $this->makeForeignKeyEntity($row);
+            $foreignKey = $this->makeForeignKeyDto($row);
             if ($foreignKey !== null) {
                 $foreignKeys[$row['conname']] = $foreignKey;
             }
@@ -338,7 +338,7 @@ AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conn
     /**
      * @inheritDoc
      */
-    public function checkConstraints(TableEntity $status): array
+    public function checkConstraints(TableDto $status): array
     {
         // From driver.inc.php
         $database = $this->driver->quote($this->driver->database());
@@ -357,7 +357,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
     /**
      * @inheritDoc
      */
-    public function partitionsInfo(string $table): PartitionEntity|null
+    public function partitionsInfo(string $table): PartitionDto|null
     {
         if (!$this->driver->minVersion(10)) {
             return null;
@@ -376,16 +376,16 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $partitionFields = implode(', ', array_map($callback, $attrs));
 
         $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];
-        return new PartitionEntity($by[$row['partstrat']], $partitionFields);
+        return new PartitionDto($by[$row['partstrat']], $partitionFields);
     }
 
     /**
      * @inheritDoc
      */
-    public function trigger(string $name, string $table = ''): TriggerEntity|null
+    public function trigger(string $name, string $table = ''): TriggerDto|null
     {
         if ($name == '') {
-            return new TriggerEntity('', '', 'EXECUTE PROCEDURE ()');
+            return new TriggerDto('', '', 'EXECUTE PROCEDURE ()');
         }
         if ($table === '') {
             $table = $this->utils->input->getTable();
@@ -400,7 +400,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         if (!($row = reset($rows))) {
             return null;
         }
-        return new TriggerEntity($row['Timing'], $row['Event'],
+        return new TriggerDto($row['Timing'], $row['Event'],
             $row['Statement'], '', $row['Trigger'],
             $row['Type'], $row['Events']);
     }
@@ -414,7 +414,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $query = "SELECT * FROM information_schema.triggers WHERE trigger_schema = current_schema() " .
             "AND event_object_table = " . $this->driver->quote($table);
         foreach ($this->driver->rows($query) as $row) {
-            $triggers[$row["trigger_name"]] = new TriggerEntity($row["action_timing"],
+            $triggers[$row["trigger_name"]] = new TriggerDto($row["action_timing"],
                 $row["event_manipulation"], '', '', $row["trigger_name"]);
         }
         return $triggers;

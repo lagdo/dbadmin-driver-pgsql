@@ -3,11 +3,11 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\AbstractDatabase;
-use Lagdo\DbAdmin\Driver\Entity\FieldType;
-use Lagdo\DbAdmin\Driver\Entity\RoutineEntity;
-use Lagdo\DbAdmin\Driver\Entity\RoutineInfoEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
-use Lagdo\DbAdmin\Driver\Entity\UserTypeEntity;
+use Lagdo\DbAdmin\Driver\Dto\FieldType;
+use Lagdo\DbAdmin\Driver\Dto\RoutineDto;
+use Lagdo\DbAdmin\Driver\Dto\RoutineInfoDto;
+use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\Dto\UserTypeDto;
 
 use function array_filter;
 use function array_map;
@@ -150,7 +150,7 @@ class Database extends AbstractDatabase
     /**
      * @inheritDoc
      */
-    public function routine(string $name, string $type): RoutineInfoEntity|null
+    public function routine(string $name, string $type): RoutineInfoDto|null
     {
         $quotedName = $this->driver->quote($name);
         $query = 'SELECT routine_definition AS definition, LOWER(external_language) AS language, * ' .
@@ -179,7 +179,7 @@ class Database extends AbstractDatabase
             return new FieldType(name: $name, type: $type, length: $length, inout: $inout);
         }, $this->driver->rows($query));
 
-        return new RoutineInfoEntity($definition, $language,
+        return new RoutineInfoDto($definition, $language,
             $params, new FieldType(type: $type));
     }
 
@@ -194,7 +194,7 @@ class Database extends AbstractDatabase
         $rows = $this->driver->rows($query);
         // The ROUTINE_TYPE field can have NULL as value
         return array_map(fn($row) =>
-            new RoutineEntity($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'],
+            new RoutineDto($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'],
                 $row['ROUTINE_TYPE'] ?: '', $row['DTD_IDENTIFIER']), $rows);
     }
 
@@ -220,7 +220,7 @@ WHERE typnamespace = {$this->nsOid} AND typtype IN ('b','d','e') AND typelem = 0
         $rows = $this->driver->rows($query);
         $types = [];
         foreach ($rows as $row) {
-            $types[$row['name']] = new UserTypeEntity($row['oid'], $row['name']);
+            $types[$row['name']] = new UserTypeDto($row['oid'], $row['name']);
         }
 
         if (!$withValues || count($types) === 0) {
@@ -244,10 +244,10 @@ WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
     /**
      * @inheritDoc
      */
-    public function enumValues(TableFieldEntity $field): array
+    public function enumValues(TableFieldDto $field): array
     {
         $types = array_filter(array_values($this->userTypes(true)),
-            fn(UserTypeEntity $type) => $type->name === $field->type);
+            fn(UserTypeDto $type) => $type->name === $field->type);
         return isset($types[0]) ? $types[0]->enums : [];
     }
 

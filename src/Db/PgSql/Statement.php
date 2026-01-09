@@ -3,7 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\Entity\StatementFieldEntity;
+use Lagdo\DbAdmin\Driver\Dto\StatementFieldDto;
 
 class Statement implements StatementInterface
 {
@@ -54,14 +54,14 @@ class Statement implements StatementInterface
     /**
      * @inheritDoc
      */
-    public function fetchField(): StatementFieldEntity|null
+    public function fetchField(): StatementFieldDto|null
     {
         $column = $this->offset++;
         // $table = function_exists('pg_field_table') ? pg_field_table($this->result, $column) : '';
         $table = pg_field_table($this->result, $column);
         $name = pg_field_name($this->result, $column);
         $type = pg_field_type($this->result, $column);
-        return new StatementFieldEntity($type, $type === "bytea", $name, $name, $table, $table);
+        return new StatementFieldDto($type, $type === "bytea", $name, $name, $table, $table);
     }
 
     /**

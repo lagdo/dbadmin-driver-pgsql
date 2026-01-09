@@ -3,11 +3,11 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Db;
 
 use Lagdo\DbAdmin\Driver\Db\AbstractGrammar;
-use Lagdo\DbAdmin\Driver\Entity\ColumnEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableAlterEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableCreateEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableEntity;
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
+use Lagdo\DbAdmin\Driver\Dto\ColumnDto;
+use Lagdo\DbAdmin\Driver\Dto\TableAlterDto;
+use Lagdo\DbAdmin\Driver\Dto\TableCreateDto;
+use Lagdo\DbAdmin\Driver\Dto\TableDto;
+use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
 
 use function array_map;
 use function count;
@@ -60,7 +60,7 @@ class Grammar extends AbstractGrammar
 
     /**
      * @param string $tableName
-     * @param array<ColumnEntity> $columns
+     * @param array<ColumnDto> $columns
      *
      * @return array<string>
      */
@@ -79,7 +79,7 @@ class Grammar extends AbstractGrammar
     /**
      * @param string $tableName
      * @param string $tableComment
-     * @param array<ColumnEntity> $columns
+     * @param array<ColumnDto> $columns
      *
      * @return array<string>
      */
@@ -100,11 +100,11 @@ class Grammar extends AbstractGrammar
 
     /**
      * @param string $tableName
-     * @param ColumnEntity $column
+     * @param ColumnDto $column
      *
      * @return string
      */
-    private function getChangedColumnValue(string $tableName, ColumnEntity $column): string
+    private function getChangedColumnValue(string $tableName, ColumnDto $column): string
     {
         if ($column->defaultValue) {
             $pattern = '~GENERATED ALWAYS(.*) STORED~';
@@ -118,11 +118,11 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @param TableAlterEntity $table
+     * @param TableAlterDto $table
      *
      * @return array<string>
      */
-    private function getTableSequenceQuery(TableAlterEntity $table): array
+    private function getTableSequenceQuery(TableAlterDto $table): array
     {
         foreach ($table->changedColumns as $column) {
             if ($column->autoIncrement) {
@@ -137,11 +137,11 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @param TableAlterEntity $table
+     * @param TableAlterDto $table
      *
      * @return array<string>
      */
-    private function getChangedColumnClauses(TableAlterEntity $table): array
+    private function getChangedColumnClauses(TableAlterDto $table): array
     {
         $clauses = [];
         foreach ($table->changedColumns as $fieldName => $column) {
@@ -156,7 +156,7 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @param array<ColumnEntity> $columns
+     * @param array<ColumnDto> $columns
      * @param string $prefix
      *
      * @return array<string>
@@ -183,7 +183,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function getTableCreationQueries(TableCreateEntity $table): array
+    public function getTableCreationQueries(TableCreateDto $table): array
     {
         $tableName = $this->driver->escapeTableName($table->name);
         // Tables columns
@@ -201,7 +201,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function getTableAlterationQueries(TableAlterEntity $table): array
+    public function getTableAlterationQueries(TableAlterDto $table): array
     {
         $tableName = $this->driver->escapeTableName($table->name);
         $renameTableQuery = [];
@@ -236,7 +236,7 @@ class Grammar extends AbstractGrammar
     /**
      * @inheritDoc
      */
-    public function getForeignKeysQueries(TableEntity $table): array
+    public function getForeignKeysQueries(TableDto $table): array
     {
         $queries = [];
 
@@ -254,7 +254,7 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @param array<TableFieldEntity> $fields
+     * @param array<TableFieldDto> $fields
      * @param boolean $autoIncrement
      * @param string $style
      *
@@ -292,11 +292,11 @@ class Grammar extends AbstractGrammar
     }
 
     /**
-     * @param TableEntity $status
+     * @param TableDto $status
      *
      * @return void
      */
-    private function addIndexQueries(TableEntity $status): void
+    private function addIndexQueries(TableDto $status): void
     {
         // From pgsql.inc.php
         $tableName = $this->driver->quote($status->name);
@@ -314,11 +314,11 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
 
     /**
      * @param array $fields
-     * @param TableEntity $status
+     * @param TableDto $status
      *
      * @return void
      */
-    private function addCommentQueries(array $fields, TableEntity $status): void
+    private function addCommentQueries(array $fields, TableDto $status): void
     {
         $table = $this->escapeId($status->schema) . '.' . $this->escapeId($status->name);
         // Comments for table & fields
@@ -336,11 +336,11 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @param string $table
      * @param array $fields
-     * @param TableEntity $status
+     * @param TableDto $status
      *
      * @return void
      */
-    private function addCreateTableQuery(array $fields, TableEntity $status): void
+    private function addCreateTableQuery(array $fields, TableDto $status): void
     {
         $table = $status->name;
         // From pgsql.inc.php

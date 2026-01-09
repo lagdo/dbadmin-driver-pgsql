@@ -5,7 +5,7 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
 use Lagdo\DbAdmin\Driver\Db\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Db\PreparedStatement;
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\Entity\TableFieldEntity;
+use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Driver\PgSql\Db\Traits\ConnectionTrait;
 
 use function addcslashes;
@@ -103,7 +103,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value($value, TableFieldEntity $field): mixed
+    public function value($value, TableFieldDto $field): mixed
     {
         $type = $field->type;
         return $type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value;
