@@ -4,10 +4,12 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Db\Traits;
 
 use Lagdo\DbAdmin\Driver\Db\StatementInterface;
 
+use function addcslashes;
 use function array_pad;
 use function preg_match;
 use function preg_replace;
 use function strlen;
+use function str_replace;
 
 trait ConnectionTrait
 {
@@ -23,6 +25,26 @@ trait ConnectionTrait
                 strlen($match[3]) . '})(.*)~', '\1<b>\2</b>', $match[2]) . $match[4];
         }
         return $message;
+    }
+
+    /**
+     * @param string $server
+     *
+     * @return string
+     */
+    protected function _server(string $server): string
+    {
+        return str_replace(":", "' port='", addcslashes($server, "'\\"));
+    }
+
+    /**
+     * @param string $database
+     *
+     * @return string
+     */
+    protected function _database(string $database): string
+    {
+        return !$database ? 'postgres' : addcslashes($database, "'\\");
     }
 
     /**

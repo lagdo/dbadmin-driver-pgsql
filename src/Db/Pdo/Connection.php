@@ -23,10 +23,10 @@ class Connection extends AbstractConnection
     */
     public function open(string $database, string $schema = ''): bool
     {
-        $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
+        $server = $this->_server($this->options('server'));
         $username = $this->options['username'];
         $password = $this->options['password'];
-        $database = !$database ? 'postgres' : addcslashes($database, "'\\");
+        $database = $this->_database($database);
         if (!$password) {
             $password = '';
         }

@@ -19,7 +19,6 @@ use function pg_query;
 use function pg_set_client_encoding;
 use function pg_unescape_bytea;
 use function pg_version;
-use function str_replace;
 use function uniqid;
 use function pg_prepare;
 use function pg_execute;
@@ -47,10 +46,10 @@ class Connection extends AbstractConnection
      */
     public function open(string $database, string $schema = ''): bool
     {
-        $server = str_replace(":", "' port='", addcslashes($this->options('server'), "'\\"));
+        $server = $this->_server($this->options('server'));
         $username = addcslashes($this->options['username'], "'\\");
         $password = addcslashes($this->options['password'], "'\\");
-        $database = !$database ? 'postgres' : addcslashes($database, "'\\");
+        $database = $this->_database($database);
 
         $connString = "host='$server' user='$username' password='$password' " .
             "dbname='$database' connect_timeout=2";
