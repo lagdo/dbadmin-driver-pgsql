@@ -130,7 +130,9 @@ class Database extends AbstractDatabase
     {
         foreach ($tables as $table) {
             $status = $this->driver->tableStatus($table);
-            if (!$this->driver->execute('DROP ' . strtoupper($status->engine) . ' ' . $this->driver->escapeTableName($table))) {
+            $engine = strtoupper($status->engine);
+            $tableName = $this->driver->escapeTableName($table);
+            if (!$this->driver->execute("DROP $engine $tableName")) {
                 return false;
             }
         }
