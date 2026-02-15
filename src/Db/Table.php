@@ -20,6 +20,7 @@ use function preg_match;
 use function preg_replace;
 use function preg_split;
 use function str_replace;
+use function trim;
 
 class Table extends AbstractTable
 {
@@ -125,8 +126,8 @@ class Table extends AbstractTable
 
         $foreignKey = new ForeignKeyDto();
         $foreignKey->definition = $row['definition'];
-        $foreignKey->source = array_map('trim', explode(',', $match[1]));
-        $foreignKey->target = array_map('trim', explode(',', $match[3]));
+        $foreignKey->source = array_map(trim(...), explode(',', $match[1]));
+        $foreignKey->target = array_map(trim(...), explode(',', $match[3]));
 
         if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match[2], $match2)) {
             $match2 = array_pad($match2, 5, '');
