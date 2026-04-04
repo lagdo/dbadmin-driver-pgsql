@@ -1,10 +1,10 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db\Pdo;
+namespace Lagdo\DbAdmin\Support\PgSql\Connection\Pdo;
 
-use Lagdo\DbAdmin\Driver\Db\Pdo\AbstractConnection;
-use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\PgSql\Db\Traits\ConnectionTrait;
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\Pdo\AbstractConnection;
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
+use Lagdo\DbAdmin\Support\PgSql\Connection\Traits\ConnectionTrait;
 
 /**
  * PostgreSQL driver to be used with the pdo_pgsql PHP extension.
@@ -41,7 +41,7 @@ class Connection extends AbstractConnection
             $this->query("SET application_name = 'Jaxon DbAdmin'");
         }
         if (($schema)) {
-            $this->query("SET search_path TO " . $this->driver->escapeId($schema));
+            $this->query("SET search_path TO " . $this->grammar->escapeId($schema));
         }
         return true;
     }

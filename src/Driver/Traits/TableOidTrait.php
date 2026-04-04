@@ -1,6 +1,6 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db\Traits;
+namespace Lagdo\DbAdmin\Support\PgSql\Driver\Traits;
 
 trait TableOidTrait
 {

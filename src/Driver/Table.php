@@ -1,14 +1,14 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db;
+namespace Lagdo\DbAdmin\Support\PgSql\Driver;
 
-use Lagdo\DbAdmin\Driver\Db\AbstractTable;
-use Lagdo\DbAdmin\Driver\Dto\ForeignKeyDto;
-use Lagdo\DbAdmin\Driver\Dto\IndexDto;
-use Lagdo\DbAdmin\Driver\Dto\PartitionDto;
-use Lagdo\DbAdmin\Driver\Dto\TableDto;
-use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
-use Lagdo\DbAdmin\Driver\Dto\TriggerDto;
+use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractTable;
+use Lagdo\DbAdmin\Support\Dto\ForeignKeyDto;
+use Lagdo\DbAdmin\Support\Dto\IndexDto;
+use Lagdo\DbAdmin\Support\Dto\PartitionDto;
+use Lagdo\DbAdmin\Support\Dto\TableDto;
+use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Support\Dto\TriggerDto;
 
 use function array_map;
 use function array_pad;
@@ -97,7 +97,7 @@ class Table extends AbstractTable
         $index->type = $this->getIndexType($row);
         $index->name = $row["relname"];
         $index->algorithm = $row["amname"];
-		$index->partial = $row["partial"];
+        $index->partial = $row["partial"];
         $indexpr = preg_split('~(?<=\)), (?=\()~', $row["indexpr"] ?? ''); //! '), (' used in expression
         foreach (explode(" ", $row["indkey"]) as $indkey) {
             $index->columns[] = ($indkey ? $columns[$indkey] : array_shift($indexpr));
@@ -244,7 +244,7 @@ class Table extends AbstractTable
             preg_match('~^unique_rowid\(~', $default)); // CockroachDB
 
         if ($default !== null && preg_match('~(.+)::[^,)]+(.*)~', $default, $match)) {
-            $default = $match[1] === "NULL" ? null : $this->driver->unescapeId($match[1]) . $match[2];
+            $default = $match[1] === "NULL" ? null : $this->grammar->unescapeId($match[1]) . $match[2];
         }
 
         return [$default, $autoIncrement];
@@ -373,7 +373,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
             str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering
         $attrs = $this->driver->values($query);
-        $callback = fn($attr) => $this->driver->escapeId($attr);
+        $callback = fn($attr) => $this->grammar->escapeId($attr);
         $partitionFields = implode(', ', array_map($callback, $attrs));
 
         $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];

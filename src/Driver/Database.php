@@ -1,25 +1,21 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db;
+namespace Lagdo\DbAdmin\Support\PgSql\Driver;
 
-use Lagdo\DbAdmin\Driver\Db\AbstractDatabase;
-use Lagdo\DbAdmin\Driver\Dto\FieldType;
-use Lagdo\DbAdmin\Driver\Dto\RoutineDto;
-use Lagdo\DbAdmin\Driver\Dto\RoutineInfoDto;
-use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
-use Lagdo\DbAdmin\Driver\Dto\UserTypeDto;
+use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractDatabase;
+use Lagdo\DbAdmin\Support\Dto\FieldType;
+use Lagdo\DbAdmin\Support\Dto\RoutineDto;
+use Lagdo\DbAdmin\Support\Dto\RoutineInfoDto;
+use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Support\Dto\UserTypeDto;
 
 use function array_filter;
 use function array_map;
-use function array_merge;
-use function array_reverse;
-use function array_unshift;
 use function array_values;
 use function count;
 use function implode;
 use function is_object;
 use function strtoupper;
-use function uniqid;
 
 class Database extends AbstractDatabase
 {
@@ -31,43 +27,6 @@ class Database extends AbstractDatabase
      * @var array
      */
     protected $systemSchemas = ['information_schema', 'pg_catalog', 'pg_temp_1', 'pg_toast', 'pg_toast_temp_1'];
-
-    /**
-     * @inheritDoc
-     */
-    public function alterIndexes(string $table, array $alter, array $drop): bool
-    {
-        $queries = [];
-        $columns = [];
-        foreach (array_reverse($drop) as $index) {
-            if ($index->type === 'INDEX') {
-                $queries[] = 'DROP INDEX ' . $this->driver->escapeId($index);
-            } else {
-                $columns[] = 'DROP CONSTRAINT ' . $this->driver->escapeId($index->name);
-            }
-        }
-        foreach ($alter as $index) {
-            if ($index->type === 'INDEX') {
-                $queries[] = 'CREATE INDEX ' .
-                    $this->driver->escapeId($index->name != '' ? $index->name : uniqid($table . '_')) .
-                    ' ON ' . $this->driver->escapeTableName($table) .
-                    ' (' . implode(', ', $index->columns) . ')';
-            } else {
-                //! descending UNIQUE indexes results in syntax error
-                $constraint = ($index->name != '' ? ' CONSTRAINT ' . $this->driver->escapeId($index->name) : '');
-                $columns[] = "ADD$constraint " . ($index->type == 'PRIMARY' ? 'PRIMARY KEY' : $index->type) .
-                    ' (' . implode(', ', $index->columns) . ')';
-            }
-        }
-        if (!empty($columns)) {
-            array_unshift($queries, 'ALTER TABLE ' .
-                $this->driver->escapeTableName($table) . implode(', ', $columns));
-        }
-        foreach ($queries as $query) {
-            $this->driver->execute($query);
-        }
-        return true;
-    }
 
     /**
      * @inheritDoc
@@ -113,30 +72,6 @@ class Database extends AbstractDatabase
             }
         }
         return $counts;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function dropViews(array $views): bool
-    {
-        return $this->dropTables($views);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function dropTables(array $tables): bool
-    {
-        foreach ($tables as $table) {
-            $status = $this->driver->tableStatus($table);
-            $engine = strtoupper($status->engine);
-            $tableName = $this->driver->escapeTableName($table);
-            if (!$this->driver->execute("DROP $engine $tableName")) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
@@ -209,7 +144,7 @@ class Database extends AbstractDatabase
         foreach ($row['fields'] as $field) {
             $types[] = $field->type;
         }
-        return $this->driver->escapeId($name) . '(' . implode(', ', $types) . ')';
+        return $this->grammar->escapeId($name) . '(' . implode(', ', $types) . ')';
     }
 
     /**
@@ -251,30 +186,5 @@ WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
         $types = array_filter(array_values($this->userTypes(true)),
             fn(UserTypeDto $type) => $type->name === $field->type);
         return isset($types[0]) ? $types[0]->enums : [];
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function moveTables(array $tables, array $views, string $target): bool
-    {
-        foreach (array_merge($tables, $views) as $table) {
-            $status = $this->driver->tableStatus($table);
-            if (!$this->driver->execute('ALTER ' . strtoupper($status->engine) . ' ' .
-                $this->driver->escapeTableName($table) . ' SET SCHEMA ' . $this->driver->escapeId($target))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function truncateTables(array $tables): bool
-    {
-        $tables = array_map(fn($table) => $this->driver->escapeTableName($table), $tables);
-        $this->driver->execute('TRUNCATE ' . implode(', ', $tables));
-        return true;
     }
 }

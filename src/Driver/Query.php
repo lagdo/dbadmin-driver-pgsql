@@ -1,10 +1,10 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db;
+namespace Lagdo\DbAdmin\Support\PgSql\Driver;
 
-use Lagdo\DbAdmin\Driver\Db\AbstractQuery;
-use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
-use Lagdo\DbAdmin\Driver\Dto\TableDto;
+use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractQuery;
+use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Support\Dto\TableDto;
 
 use function array_keys;
 use function implode;
@@ -16,29 +16,32 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function insertOrUpdate(string $table, array $rows, array $primary): bool
-    {
-        foreach ($rows as $set) {
-            $update = [];
-            $where = [];
-            foreach ($set as $key => $val) {
-                $update[] = "$key = $val";
-                if (isset($primary[$this->driver->unescapeId($key)])) {
-                    $where[] = "$key = $val";
-                }
-            }
-            if (!(
-                ($where && $this->driver->execute("UPDATE " . $this->driver->escapeTableName($table) .
-                " SET " . implode(", ", $update) . " WHERE " . implode(" AND ", $where)) &&
-                $this->driver->affectedRows()) ||
-                $this->driver->execute("INSERT INTO " . $this->driver->escapeTableName($table) .
-                " (" . implode(", ", array_keys($set)) . ") VALUES (" . implode(", ", $set) . ")")
-            )) {
-                return false;
-            }
-        }
-        return true;
-    }
+    // public function insertOrUpdate(string $table, array $rows, array $primary): bool
+    // {
+    //     $tableName = $this->grammar->escapeTableName($table);
+    //     foreach ($rows as $set) {
+    //         $update = [];
+    //         $where = [];
+    //         foreach ($set as $key => $val) {
+    //             $update[] = "$key = $val";
+    //             if (isset($primary[$this->grammar->unescapeId($key)])) {
+    //                 $where[] = "$key = $val";
+    //             }
+    //         }
+    //         $updateFields = implode(", ", $update);
+    //         $updateFilters = implode(" AND ", $where);
+    //         $insertFields = implode(", ", array_keys($set));
+    //         $insertValues = implode(", ", $set);
+    //         if (!(
+    //             ($where && $this->driver->execute("UPDATE $tableName SET $updateFields WHERE $updateFilters") &&
+    //             $this->driver->affectedRows()) ||
+    //             $this->driver->execute("INSERT INTO $tableName ($insertFields) VALUES ($insertValues)")
+    //         )) {
+    //             return false;
+    //         }
+    //     }
+    //     return true;
+    // }
 
     /**
      * @inheritDoc
@@ -64,7 +67,7 @@ class Query extends AbstractQuery
      */
     public function countRows(TableDto $tableStatus, array $where): int|null
     {
-        $query = "EXPLAIN SELECT * FROM " . $this->driver->escapeId($tableStatus->name) .
+        $query = "EXPLAIN SELECT * FROM " . $this->grammar->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");
         if (preg_match("~ rows=([0-9]+)~", $this->driver->result($query), $regs))
         {

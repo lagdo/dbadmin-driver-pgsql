@@ -1,12 +1,12 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db\PgSql;
+namespace Lagdo\DbAdmin\Support\PgSql\Connection\PgSql;
 
-use Lagdo\DbAdmin\Driver\Db\AbstractConnection;
-use Lagdo\DbAdmin\Driver\Db\PreparedStatement;
-use Lagdo\DbAdmin\Driver\Db\StatementInterface;
-use Lagdo\DbAdmin\Driver\Dto\TableFieldDto;
-use Lagdo\DbAdmin\Driver\PgSql\Db\Traits\ConnectionTrait;
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\PreparedStatement;
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
+use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractConnection;
+use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Support\PgSql\Connection\Traits\ConnectionTrait;
 
 use function addcslashes;
 use function pg_affected_rows;
@@ -71,7 +71,7 @@ class Connection extends AbstractConnection
             }
         }
         if (($schema)) {
-            if (@pg_query($this->client, "SET search_path TO " . $this->driver->escapeId($schema)) === false) {
+            if (@pg_query($this->client, "SET search_path TO " . $this->grammar->escapeId($schema)) === false) {
                 $this->setError(pg_last_error($this->client));
             }
         }

@@ -1,9 +1,9 @@
 <?php
 
-namespace Lagdo\DbAdmin\Driver\PgSql\Db;
+namespace Lagdo\DbAdmin\Support\PgSql\Driver;
 
-use Lagdo\DbAdmin\Driver\Db\AbstractServer;
-use Lagdo\DbAdmin\Driver\Db\StatementInterface;
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
+use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractServer;
 
 use function in_array;
 use function is_a;
@@ -82,41 +82,6 @@ class Server extends AbstractServer
     {
         return in_array($database, ['information_schema',
             'pg_catalog', 'pg_toast', 'postgres', 'template0', 'template1']);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function createDatabase(string $database, string $collation): bool
-    {
-        $result = $this->driver->execute("CREATE DATABASE " . $this->driver->escapeId($database) .
-            ($collation ? " ENCODING " . $this->driver->escapeId($collation) : ""));
-        return $result !== false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function dropDatabase(string $database): bool
-    {
-        // Cannot drop the connected database.
-        if ($this->driver->database() === $database) {
-            return false;
-        }
-        $result = $this->driver->execute('DROP DATABASE ' . $this->driver->escapeId($database));
-        return $result !== false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function renameDatabase(string $name, string $collation): bool
-    {
-        //! current database cannot be renamed
-        $currName = $this->driver->escapeId($this->driver->database());
-        $nextName = $this->driver->escapeId($name);
-        $result = $this->driver->execute("ALTER DATABASE $currName RENAME TO $nextName");
-        return $result !== false;
     }
 
     /**
