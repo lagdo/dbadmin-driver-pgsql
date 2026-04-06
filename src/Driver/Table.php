@@ -373,8 +373,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
             str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering
         $attrs = $this->driver->values($query);
-        $callback = fn($attr) => $this->grammar->escapeId($attr);
-        $partitionFields = implode(', ', array_map($callback, $attrs));
+        $partitionFields = implode(', ', array_map($this->grammar->escapeId(...), $attrs));
 
         $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];
         return new PartitionDto($by[$row['partstrat']], $partitionFields);
