@@ -359,7 +359,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     /**
      * @inheritDoc
      */
-    public function getTableDefinitionQueries(string $table, bool $autoIncrement, string $style): string
+    public function getExportTableQueries(string $table, bool $autoIncrement, string $style): string
     {
         $status = $this->driver->tableStatus($table);
         if ($status === null) {

@@ -15,7 +15,6 @@ use function array_values;
 use function count;
 use function implode;
 use function is_object;
-use function strtoupper;
 
 class Database extends AbstractDatabase
 {
