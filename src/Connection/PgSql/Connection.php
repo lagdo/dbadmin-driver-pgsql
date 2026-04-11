@@ -2,9 +2,9 @@
 
 namespace Lagdo\DbAdmin\Support\PgSql\Connection\PgSql;
 
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\AbstractConnection;
 use Lagdo\DbAdmin\Support\Db\Engine\Connection\PreparedStatement;
 use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
-use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractConnection;
 use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Support\PgSql\Connection\Traits\ConnectionTrait;
 

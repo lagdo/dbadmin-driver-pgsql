@@ -2,15 +2,117 @@
 
 namespace Lagdo\DbAdmin\Support\PgSql\Driver;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
 use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractServer;
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\AbstractConnection;
+use Lagdo\DbAdmin\Support\Exception\AuthException;
+use Lagdo\DbAdmin\Support\PgSql\Connection;
 
-use function in_array;
-use function is_a;
-use function intval;
+use function array_map;
+use function count;
+use function extension_loaded;
 
 class Server extends AbstractServer
 {
+    /**
+     * @inheritDoc
+     */
+    protected function starting(): void
+    {
+        $trans = $this->utils->trans;
+        // Init config
+        $this->config->jush = 'pgsql';
+        $this->config->drivers = ["PgSQL", "PDO_PgSQL"];
+        $this->config->types = [ //! arrays
+            $trans->lang('Numbers') => ["smallint" => 5, "integer" => 10, "bigint" => 19, "boolean" => 1,
+                "numeric" => 0, "real" => 7, "double precision" => 16, "money" => 20],
+            $trans->lang('Date and time') => ["date" => 13, "time" => 17, "timestamp" => 20, "timestamptz" => 21, "interval" => 0],
+            $trans->lang('Strings') => ["character" => 0, "character varying" => 0, "text" => 0,
+                "tsquery" => 0, "tsvector" => 0, "uuid" => 0, "xml" => 0],
+            $trans->lang('Binary') => ["bit" => 0, "bit varying" => 0, "bytea" => 0],
+            $trans->lang('Network') => ["cidr" => 43, "inet" => 43, "macaddr" => 17, "txid_snapshot" => 0],
+            $trans->lang('Geometry') => ["box" => 0, "circle" => 0, "line" => 0, "lseg" => 0,
+                "path" => 0, "point" => 0, "polygon" => 0],
+        ];
+        // $this->config->unsigned = [];
+        $this->config->operators = ["=", "<", ">", "<=", ">=", "!=", "~", "!~", "LIKE",
+            "LIKE %%", "ILIKE", "ILIKE %%", "IN", "IS NULL", "NOT LIKE", "NOT ILIKE",
+            "NOT IN", "IS NOT NULL", "SQL"]; // no "SQL" to avoid CSRF
+        $this->config->functions = ["char_length", "lower", "round", "to_hex", "to_timestamp", "upper"];
+        $this->config->grouping = ["avg", "count", "count distinct", "max", "min", "sum"];
+        $this->config->insertFunctions = [
+            "char" => ["md5"],
+            "date|time" => ["now"],
+        ];
+        $this->config->editFunctions = [
+            $this->driver->numberRegex() => ["+", "-"],
+            "date|time" => ["+ interval", "- interval"], //! escape
+            "char|text" => ["||"],
+        ];
+        $this->config->features = ['check', 'columns', 'comment', 'database', 'drop_col', 'dump',
+            'descidx', 'indexes', 'kill', 'partial_indexes', 'routine', 'scheme', 'sequence',
+            'sql', 'table', 'trigger', 'type', 'variables', 'view'];
+
+        // Regex to parse SQL statements in a text
+        $this->config->sqlStatementRegex = '\\s*|[\'"]|/\*|-- |$|\$[^$]*\$';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function connected(): void
+    {
+        $trans = $this->utils->trans;
+        //! get types from current_schemas('t')
+        $userTypes = array_map(fn($type) => (int)$type->oid, $this->driver->userTypes(false));
+        if (count($userTypes) > 0) {
+            $this->config->types[$trans->lang('User types')] = $userTypes;
+        }
+
+        if ($this->driver->minVersion(9.2, 0)) {
+            $this->config->types[$trans->lang('Strings')]["json"] = 4294967295;
+            if ($this->driver->minVersion(9.4, 0)) {
+                $this->config->types[$trans->lang('Strings')]["jsonb"] = 4294967295;
+            }
+        }
+        if ($this->driver->minVersion(12, 0)) {
+            $this->config->generated = ["STORED"];
+        }
+        $this->config->partitionBy = ["RANGE", "LIST"];
+        // if (!connection()->flavor) {
+        //     $this->config->partitionBy[] = "HASH";
+        // }
+
+        if ($this->driver->minVersion(9.3)) {
+            $this->config->features[] = 'materializedview';
+        }
+        if ($this->driver->minVersion(11)) {
+            $this->config->features[] = 'procedure';
+        }
+        /*if (connection()->flavor == 'cockroach)*/ {
+            $this->config->features[] = 'processlist';
+        }
+    }
+
+    /**
+     * @inheritDoc
+     * @throws AuthException
+     */
+    public function createConnection(array $options): AbstractConnection|null
+    {
+        $preferPdo = $options['prefer_pdo'] ?? false;
+        if (!$preferPdo && extension_loaded("pgsql")) {
+            return new Connection\PgSql\Connection($this->driver,
+                $this->grammar, $this->utils, $options, 'PgSQL');
+        }
+        if (extension_loaded("pdo_pgsql")) {
+            return new Connection\Pdo\Connection($this->driver,
+                $this->grammar, $this->utils, $options, 'PDO_PgSQL');
+        }
+
+        throw new AuthException($this->utils->trans
+            ->lang('No package installed to connect to a PostgreSQL server.'));
+    }
+
     /**
      * @inheritDoc
      */
@@ -30,58 +132,10 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    public function databases(bool $flush): array
-    {
-        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
-            "AND datname not in ('postgres','template0','template1') ORDER BY datname";
-        return $this->driver->values($query);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function databaseSize(string $database): int
-    {
-        $statement = $this->driver->execute("SELECT pg_database_size(" . $this->driver->quote($database) . ")");
-        if (is_a($statement, StatementInterface::class) && ($row = $statement->fetchRow())) {
-            return intval($row[0]);
-        }
-        return 0;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function databaseCollation(string $database, array $collations): string
-    {
-        return $this->driver->result("SELECT datcollate FROM pg_database WHERE datname = " .
-            $this->driver->quote($database));
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function collations(): array
     {
         //! supported in CREATE DATABASE
         return [];
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function isInformationSchema(string $database): bool
-    {
-        return $database == "information_schema";
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function isSystemSchema(string $database): bool
-    {
-        return in_array($database, ['information_schema',
-            'pg_catalog', 'pg_toast', 'postgres', 'template0', 'template1']);
     }
 
     /**
@@ -107,18 +161,6 @@ class Server extends AbstractServer
     {
         return $this->driver->rows("SELECT * FROM pg_stat_activity ORDER BY " .
             ($this->driver->minVersion(9.2) ? "pid" : "procpid"));
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function processAttr(array $process, string $key, string $val): string
-    {
-        if ($key == "current_query" && $val != "<IDLE>") {
-            return '<code>' . $this->utils->str->shortenUtf8($val, 50) .
-                '</code>' . $this->utils->trans->lang('Clone');
-        }
-        return parent::processAttr($process, $key, $val);
     }
 
     /**

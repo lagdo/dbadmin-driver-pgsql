@@ -11,7 +11,7 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    protected function limitToOne(string $table, string $query, string $where): string
+    public function limitToOne(string $table, string $query, string $where): string
     {
         return preg_match('~^INTO~', $query) ?
             $this->getLimitClause($query, $where, 1, 0) :

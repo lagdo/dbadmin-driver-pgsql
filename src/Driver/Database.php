@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Support\PgSql\Driver;
 
+use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
 use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractDatabase;
 use Lagdo\DbAdmin\Support\Dto\FieldType;
 use Lagdo\DbAdmin\Support\Dto\RoutineDto;
@@ -14,6 +15,9 @@ use function array_map;
 use function array_values;
 use function count;
 use function implode;
+use function intval;
+use function in_array;
+use function is_a;
 use function is_object;
 
 class Database extends AbstractDatabase
@@ -26,6 +30,54 @@ class Database extends AbstractDatabase
      * @var array
      */
     protected $systemSchemas = ['information_schema', 'pg_catalog', 'pg_temp_1', 'pg_toast', 'pg_toast_temp_1'];
+
+    /**
+     * @inheritDoc
+     */
+    public function databases(bool $flush): array
+    {
+        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
+            "AND datname not in ('postgres','template0','template1') ORDER BY datname";
+        return $this->driver->values($query);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function databaseSize(string $database): int
+    {
+        $statement = $this->driver->execute("SELECT pg_database_size(" . $this->driver->quote($database) . ")");
+        if (is_a($statement, StatementInterface::class) && ($row = $statement->fetchRow())) {
+            return intval($row[0]);
+        }
+        return 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function databaseCollation(string $database, array $collations): string
+    {
+        return $this->driver->result("SELECT datcollate FROM pg_database WHERE datname = " .
+            $this->driver->quote($database));
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isInformationSchema(string $database): bool
+    {
+        return $database == "information_schema";
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isSystemSchema(string $database): bool
+    {
+        return in_array($database, ['information_schema',
+            'pg_catalog', 'pg_toast', 'postgres', 'template0', 'template1']);
+    }
 
     /**
      * @inheritDoc

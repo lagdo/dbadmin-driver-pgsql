@@ -3,7 +3,6 @@
 namespace Lagdo\DbAdmin\Support\PgSql;
 
 use Lagdo\DbAdmin\Support\AbstractGrammar;
-use Lagdo\DbAdmin\Support\Utils\Utils;
 
 class Grammar extends AbstractGrammar
 {
@@ -26,13 +25,6 @@ class Grammar extends AbstractGrammar
      * @var Grammar\Query|null
      */
     private Grammar\Query|null $query = null;
-
-    /**
-     * @param Driver $driver
-     * @param Utils $utils
-     */
-    public function __construct(protected Driver $driver, protected Utils $utils)
-    {}
 
     /**
      * @return Grammar\Syntax
