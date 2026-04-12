@@ -43,7 +43,7 @@ class Table extends AbstractTable
         $queries = [];
         foreach ($columns as $fieldName => $column) {
             if ($fieldName !== $column->field->name) {
-                $fieldName = $this->grammar->escapeId($fieldName);
+                $fieldName = $this->_grammar()->escapeId($fieldName);
                 $queries[] = "ALTER TABLE $tableName RENAME $fieldName TO {$column->name}";
             }
         }
@@ -67,7 +67,7 @@ class Table extends AbstractTable
             }
         }
         if ($tableComment !== '') {
-            $queries[] = "COMMENT ON TABLE {$tableName} IS " . $this->driver->quote($tableComment);
+            $queries[] = "COMMENT ON TABLE {$tableName} IS " . $this->_driver()->quote($tableComment);
         }
         return $queries;
     }
@@ -87,7 +87,7 @@ class Table extends AbstractTable
 
         $sequenceName = "{$tableName}_{$column->field->name}_seq";
         return $column->autoIncrement ?
-            "SET DEFAULT nextval(" . $this->driver->quote($sequenceName) . ")" :
+            "SET DEFAULT nextval(" . $this->_driver()->quote($sequenceName) . ")" :
             "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
     }
 
@@ -101,7 +101,7 @@ class Table extends AbstractTable
         foreach ($table->changedColumns as $column) {
             if ($column->autoIncrement) {
                 $sequenceName = "{$table->name}_{$column->field->name}_seq";
-                $tableName = $this->grammar->escapeTableName($table->name);
+                $tableName = $this->_grammar()->escapeTableName($table->name);
                 return [
                     "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.{$column->name}",
                 ];
@@ -119,7 +119,7 @@ class Table extends AbstractTable
     {
         $clauses = [];
         foreach ($table->changedColumns as $fieldName => $column) {
-            $fieldName =  $this->grammar->escapeId($fieldName);
+            $fieldName =  $this->_grammar()->escapeId($fieldName);
             $clauses[] = "ALTER $fieldName TYPE{$column->type}";
             $clauses[] = "ALTER $fieldName " .
                 $this->getChangedColumnValue($table->name, $column);
@@ -159,7 +159,7 @@ class Table extends AbstractTable
      */
     public function getCreateTableQueries(TableCreateDto $table): array
     {
-        $tableName = $this->grammar->escapeTableName($table->name);
+        $tableName = $this->_grammar()->escapeTableName($table->name);
         // Tables columns
         $columns = [
             ...$this->getAddedColumnClauses($table->columns),
@@ -177,15 +177,15 @@ class Table extends AbstractTable
      */
     public function getAlterTableQueries(TableAlterDto $table): array
     {
-        $tableName = $this->grammar->escapeTableName($table->name);
+        $tableName = $this->_grammar()->escapeTableName($table->name);
         $renameTableQuery = [];
         if ($table->name !== $table->current->name) {
-            $currTableName = $this->grammar->escapeTableName($table->current->name);
+            $currTableName = $this->_grammar()->escapeTableName($table->current->name);
             $renameTableQuery[] = "ALTER TABLE $currTableName RENAME TO $tableName";
         }
 
         $droppedColumnClauses = array_map(fn($fieldName) =>
-            'DROP ' .  $this->grammar->escapeId($fieldName), $table->droppedColumns);
+            'DROP ' .  $this->_grammar()->escapeId($fieldName), $table->droppedColumns);
         $clauses =  [
             ...$this->getAddedColumnClauses($table->addedColumns, 'ADD '),
             ...$this->getChangedColumnClauses($table),
@@ -214,13 +214,13 @@ class Table extends AbstractTable
     {
         $queries = [];
 
-        $foreignKeys = $this->driver->foreignKeys($table->name);
+        $foreignKeys = $this->_driver()->foreignKeys($table->name);
         ksort($foreignKeys);
 
         foreach ($foreignKeys as $name => $foreignKey) {
-            $queries[] = "ALTER TABLE ONLY " . $this->grammar->escapeId($table->schema) .
-                "." . $this->grammar->escapeId($table->name) . " ADD CONSTRAINT " .
-                $this->grammar->escapeId($name) . " {$foreignKey->definition} " .
+            $queries[] = "ALTER TABLE ONLY " . $this->_grammar()->escapeId($table->schema) .
+                "." . $this->_grammar()->escapeId($table->name) . " ADD CONSTRAINT " .
+                $this->_grammar()->escapeId($name) . " {$foreignKey->definition} " .
                 ($foreignKey->deferrable ? 'DEFERRABLE' : 'NOT DEFERRABLE') . ';';
         }
 
@@ -242,8 +242,8 @@ class Table extends AbstractTable
             // sequences for fields
             if (preg_match('~nextval\(\'([^\']+)\'\)~', $default, $matches)) {
                 $sequenceName = $matches[1];
-                $quotedName = $this->driver->quote($sequenceName);
-                $rows = $this->driver->rows($this->driver->minVersion(10) ?
+                $quotedName = $this->_driver()->quote($sequenceName);
+                $rows = $this->_driver()->rows($this->_driver()->minVersion(10) ?
                     "SELECT *, cache_size AS cache_value FROM pg_sequences " .
                         "WHERE schemaname = current_schema() AND sequencename = $quotedName" :
                     "SELECT * FROM $sequenceName");
@@ -273,14 +273,14 @@ class Table extends AbstractTable
     private function addIndexQueries(TableDto $status): void
     {
         // From pgsql.inc.php
-        $tableName = $this->driver->quote($status->name);
+        $tableName = $this->_driver()->quote($status->name);
         // Primary keys are not added here.
         $primaryClause = !$this->_primaryIndexName ? '' :
-            " AND indexname != " . $this->driver->quote($this->_primaryIndexName);
+            " AND indexname != " . $this->_driver()->quote($this->_primaryIndexName);
         $query = "SELECT indexdef FROM pg_catalog.pg_indexes
 WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         // Indexes after table definition
-        foreach ($this->driver->rows($query) as $row) {
+        foreach ($this->_driver()->rows($query) as $row) {
             $this->_tableQueries[] = ''; // Insert an empty line
             $this->_tableQueries[] = $row['indexdef'] . ';';
         }
@@ -294,15 +294,15 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
      */
     private function addCommentQueries(array $fields, TableDto $status): void
     {
-        $table = $this->grammar->escapeId($status->schema) . '.' . $this->grammar->escapeId($status->name);
+        $table = $this->_grammar()->escapeId($status->schema) . '.' . $this->_grammar()->escapeId($status->name);
         // Comments for table & fields
         if ($status->comment) {
-            $this->_tableQueries[] = "\nCOMMENT ON TABLE $table IS " . $this->driver->quote($status->comment) . ";";
+            $this->_tableQueries[] = "\nCOMMENT ON TABLE $table IS " . $this->_driver()->quote($status->comment) . ";";
         }
         foreach ($fields as $name => $field) {
             if ($field->comment) {
-                $this->_tableQueries[] = "\nCOMMENT ON COLUMN $table." . $this->grammar->escapeId($name) .
-                    " IS " . $this->driver->quote($field->comment) . ";";
+                $this->_tableQueries[] = "\nCOMMENT ON COLUMN $table." . $this->_grammar()->escapeId($name) .
+                    " IS " . $this->_driver()->quote($field->comment) . ";";
             }
         }
     }
@@ -321,36 +321,36 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         $clauses = [];
         // Fields definitions
         foreach ($fields as $field) {
-            $clauses[] = $this->grammar->escapeId($field->name) . ' ' . $field->fullType .
+            $clauses[] = $this->_grammar()->escapeId($field->name) . ' ' . $field->fullType .
                 $this->getDefaultValueClause($field) . ($field->nullable ? "" : " NOT NULL");
         }
 
-        $indexes = $this->driver->indexes($table);
+        $indexes = $this->_driver()->indexes($table);
         ksort($indexes);
         // Primary + unique keys
-        $escape = fn($column) => $this->grammar->escapeId($column);
+        $escape = fn($column) => $this->_grammar()->escapeId($column);
         foreach ($indexes as $indexName => $index) {
             // Only primary indexes are added here (with the CONSTRAINT keyword).
             if ($index->type === 'PRIMARY') {
                 $this->_primaryIndexName = $indexName;
-                $indexName = $this->grammar->escapeId($indexName);
+                $indexName = $this->_grammar()->escapeId($indexName);
                 $indexFields = implode(', ', array_map($escape, $index->columns));
                 $clauses[] = "CONSTRAINT $indexName PRIMARY KEY ($indexFields)";
             }
         }
 
         // Constraints
-        $constraints = $this->driver->checkConstraints($status);
+        $constraints = $this->_driver()->checkConstraints($status);
         foreach ($constraints as $conname => $consrc) {
-            $clauses[] = "CONSTRAINT " . $this->grammar->escapeId($conname) . " CHECK $consrc";
+            $clauses[] = "CONSTRAINT " . $this->_grammar()->escapeId($conname) . " CHECK $consrc";
         }
 
         // Partitions
-        $partition = $this->driver->partitionsInfo($table);
+        $partition = $this->_driver()->partitionsInfo($table);
         $partitionClause = !$partition ? '' :
             "\nPARTITION BY {$partition->strategy}({$partition->fields})";
 
-        $tableName = $this->grammar->escapeId($status->schema) . '.' . $this->grammar->escapeId($table);
+        $tableName = $this->_grammar()->escapeId($status->schema) . '.' . $this->_grammar()->escapeId($table);
         $this->_tableQueries[] = "CREATE TABLE $tableName (\n    " .
             implode(",\n    ", $clauses) .
             "\n)$partitionClause\nWITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
@@ -361,17 +361,17 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
      */
     public function getExportTableQueries(string $table, bool $autoIncrement, string $style): string
     {
-        $status = $this->driver->tableStatus($table);
+        $status = $this->_driver()->tableStatus($table);
         if ($status === null) {
             return '';
         }
 
-        if ($this->driver->isView($status)) {
-            $view = $this->driver->view($table);
-            return rtrim("CREATE VIEW " . $this->grammar->escapeId($table) . " AS $view[select]", ";");
+        if ($this->_driver()->isView($status)) {
+            $view = $this->_driver()->view($table);
+            return rtrim("CREATE VIEW " . $this->_grammar()->escapeId($table) . " AS $view[select]", ";");
         }
 
-        $fields = $this->driver->fields($table);
+        $fields = $this->_driver()->fields($table);
         if (empty($fields)) {
             return '';
         }
@@ -392,7 +392,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
      */
     public function getTruncateTableQuery(string $table): string
     {
-        return "TRUNCATE " . $this->grammar->escapeTableName($table);
+        return "TRUNCATE " . $this->_grammar()->escapeTableName($table);
     }
 
     /**
@@ -400,13 +400,13 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
      */
     public function getCreateTriggerQuery(string $table): string
     {
-        $status = $this->driver->tableStatus($table);
+        $status = $this->_driver()->tableStatus($table);
         $query = "";
-        foreach ($this->driver->triggers($table) as $trg_id => $_) {
-            $trigger = $this->driver->trigger($trg_id, $status->name);
-            $triggerName = $this->grammar->escapeId($trigger->name);
-            $statusName = $this->grammar->escapeId($status->name);
-            $schema = $this->grammar->escapeId($status->schema);
+        foreach ($this->_driver()->triggers($table) as $trg_id => $_) {
+            $trigger = $this->_driver()->trigger($trg_id, $status->name);
+            $triggerName = $this->_grammar()->escapeId($trigger->name);
+            $statusName = $this->_grammar()->escapeId($status->name);
+            $schema = $this->_grammar()->escapeId($status->schema);
             $query .= "\nCREATE TRIGGER $triggerName {$trigger->timing} {$trigger->events} " .
                 "ON $schema.$statusName {$trigger->type} {$trigger->statement};;\n";
         }
@@ -422,27 +422,27 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         $columns = [];
         foreach (array_reverse($drop) as $index) {
             if ($index->type === 'INDEX') {
-                $queries[] = 'DROP INDEX ' . $this->grammar->escapeId($index);
+                $queries[] = 'DROP INDEX ' . $this->_grammar()->escapeId($index);
             } else {
-                $columns[] = 'DROP CONSTRAINT ' . $this->grammar->escapeId($index->name);
+                $columns[] = 'DROP CONSTRAINT ' . $this->_grammar()->escapeId($index->name);
             }
         }
         foreach ($alter as $index) {
             if ($index->type === 'INDEX') {
                 $queries[] = 'CREATE INDEX ' .
-                    $this->grammar->escapeId($index->name != '' ? $index->name : uniqid($table . '_')) .
-                    ' ON ' . $this->grammar->escapeTableName($table) .
+                    $this->_grammar()->escapeId($index->name != '' ? $index->name : uniqid($table . '_')) .
+                    ' ON ' . $this->_grammar()->escapeTableName($table) .
                     ' (' . implode(', ', $index->columns) . ')';
             } else {
                 //! descending UNIQUE indexes results in syntax error
-                $constraint = ($index->name != '' ? ' CONSTRAINT ' . $this->grammar->escapeId($index->name) : '');
+                $constraint = ($index->name != '' ? ' CONSTRAINT ' . $this->_grammar()->escapeId($index->name) : '');
                 $columns[] = "ADD$constraint " . ($index->type == 'PRIMARY' ? 'PRIMARY KEY' : $index->type) .
                     ' (' . implode(', ', $index->columns) . ')';
             }
         }
         if (!empty($columns)) {
             array_unshift($queries, 'ALTER TABLE ' .
-                $this->grammar->escapeTableName($table) . implode(', ', $columns));
+                $this->_grammar()->escapeTableName($table) . implode(', ', $columns));
         }
         return $queries;
     }

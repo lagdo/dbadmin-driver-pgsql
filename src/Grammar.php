@@ -31,7 +31,7 @@ class Grammar extends AbstractGrammar
      */
     protected function _syntax(): Grammar\Syntax
     {
-        return $this->syntax ??= new Grammar\Syntax($this->driver, $this, $this->utils);
+        return $this->syntax ??= new Grammar\Syntax($this->_driver(), $this, $this->_utils());
     }
 
     /**
@@ -39,7 +39,7 @@ class Grammar extends AbstractGrammar
      */
     protected function _database(): Grammar\Database
     {
-        return $this->database ??= new Grammar\Database($this->driver, $this, $this->utils);
+        return $this->database ??= new Grammar\Database($this->_driver(), $this, $this->_utils());
     }
 
     /**
@@ -47,7 +47,7 @@ class Grammar extends AbstractGrammar
      */
     protected function _table(): Grammar\Table
     {
-        return $this->table ??= new Grammar\Table($this->driver, $this, $this->utils);
+        return $this->table ??= new Grammar\Table($this->_driver(), $this, $this->_utils());
     }
 
     /**
@@ -55,6 +55,6 @@ class Grammar extends AbstractGrammar
      */
     protected function _query(): Grammar\Query
     {
-        return $this->query ??= new Grammar\Query($this->driver, $this, $this->utils);
+        return $this->query ??= new Grammar\Query($this->_driver(), $this, $this->_utils());
     }
 }

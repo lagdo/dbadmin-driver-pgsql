@@ -17,6 +17,6 @@ trait TableOidTrait
     protected function tableOid(string $table): string
     {
         return "(SELECT oid FROM pg_class WHERE relnamespace = {$this->nsOid} AND relname = " .
-            $this->driver->quote($table) . " AND relkind IN ('r', 'm', 'v', 'f', 'p'))";
+            $this->_driver()->quote($table) . " AND relkind IN ('r', 'm', 'v', 'f', 'p'))";
     }
 }

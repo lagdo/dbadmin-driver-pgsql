@@ -40,7 +40,7 @@ class Database extends AbstractDatabase
      */
     public function getUseDatabaseQuery(string $database, string $style = ''): string
     {
-        $name = $this->grammar->escapeId($database);
+        $name = $this->_grammar()->escapeId($database);
         return $this->getInitDatabaseQuery($name, $style) . "\\connect $name;";
     }
 
@@ -49,8 +49,8 @@ class Database extends AbstractDatabase
      */
     public function getCreateDatabaseQuery(string $database, string $collation): string
     {
-        return "CREATE DATABASE " . $this->grammar->escapeId($database) .
-            ($collation ? " ENCODING " . $this->grammar->escapeId($collation) : "");
+        return "CREATE DATABASE " . $this->_grammar()->escapeId($database) .
+            ($collation ? " ENCODING " . $this->_grammar()->escapeId($collation) : "");
     }
 
     /**
@@ -58,7 +58,7 @@ class Database extends AbstractDatabase
      */
     public function getDropDatabaseQuery(string $database): string
     {
-        return 'DROP DATABASE ' . $this->grammar->escapeId($database);
+        return 'DROP DATABASE ' . $this->_grammar()->escapeId($database);
     }
 
     /**
@@ -75,9 +75,9 @@ class Database extends AbstractDatabase
     public function getDropTablesQueries(array $tables): array
     {
         return array_map(function(string $table) {
-            $status = $this->driver->tableStatus($table);
+            $status = $this->_driver()->tableStatus($table);
             $engine = strtoupper($status->engine);
-            $tableName = $this->grammar->escapeTableName($table);
+            $tableName = $this->_grammar()->escapeTableName($table);
             return "DROP $engine $tableName";
         }, $tables);
     }
@@ -88,7 +88,7 @@ class Database extends AbstractDatabase
     public function getTruncateTablesQueries(array $tables): array
     {
         return [
-            'TRUNCATE ' . implode(', ', array_map($this->grammar->escapeTableName(...), $tables)),
+            'TRUNCATE ' . implode(', ', array_map($this->_grammar()->escapeTableName(...), $tables)),
         ];
     }
 }

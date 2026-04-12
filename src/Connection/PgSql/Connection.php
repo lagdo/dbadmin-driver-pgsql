@@ -61,17 +61,17 @@ class Connection extends AbstractConnection
         // }
 
         if (!$this->client) {
-            $this->setError($this->utils->trans->lang('Unable to connect to database server.'));
+            $this->setError($this->_utils()->lang('Unable to connect to database server.'));
             return false;
         }
 
-        if ($this->driver->minVersion(9, 0)) {
+        if ($this->_driver()->minVersion(9, 0)) {
             if (@pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
                 $this->setError(pg_last_error($this->client));
             }
         }
         if (($schema)) {
-            if (@pg_query($this->client, "SET search_path TO " . $this->grammar->escapeId($schema)) === false) {
+            if (@pg_query($this->client, "SET search_path TO " . $this->_grammar()->escapeId($schema)) === false) {
                 $this->setError(pg_last_error($this->client));
             }
         }
@@ -208,6 +208,6 @@ class Connection extends AbstractConnection
     protected function warnings(): string
     {
         // second parameter is available since PHP 7.1.0
-        return $this->utils->str->html(pg_last_notice($this->client));
+        return $this->_utils()->str->html(pg_last_notice($this->client));
     }
 }

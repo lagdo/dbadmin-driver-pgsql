@@ -38,12 +38,12 @@ class Table extends AbstractTable
             "pg_relation_size(c.oid) AS \"Data_length\", " .
             "pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\", " .
             "obj_description(c.oid, 'pg_class') AS \"Comment\", " .
-            ($this->driver->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
+            ($this->_driver()->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
             " AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c " .
             "JOIN pg_namespace n ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
             "WHERE relkind IN ('r', 'm', 'v', 'f', 'p') " .
-            ($table != "" ? "AND relname = " . $this->driver->quote($table) : "ORDER BY relname");
-        return $this->driver->rows($query);
+            ($table != "" ? "AND relname = " . $this->_driver()->quote($table) : "ORDER BY relname");
+        return $this->_driver()->rows($query);
     }
 
     /**
@@ -121,7 +121,7 @@ class Table extends AbstractTable
             return null;
         }
 
-        $onActions = $this->driver->actions();
+        $onActions = $this->_driver()->actions();
         $match = array_pad($match, 5, '');
 
         $foreignKey = new ForeignKeyDto();
@@ -244,7 +244,7 @@ class Table extends AbstractTable
             preg_match('~^unique_rowid\(~', $default)); // CockroachDB
 
         if ($default !== null && preg_match('~(.+)::[^,)]+(.*)~', $default, $match)) {
-            $default = $match[1] === "NULL" ? null : $this->grammar->unescapeId($match[1]) . $match[2];
+            $default = $match[1] === "NULL" ? null : $this->_grammar()->unescapeId($match[1]) . $match[2];
         }
 
         return [$default, $autoIncrement];
@@ -279,14 +279,14 @@ class Table extends AbstractTable
     {
         $fields = [];
         $tableOid = $this->tableOid($table);
-        $optionalFields = ($this->driver->minVersion(10) ? ",a.attidentity" .
-            ($this->driver->minVersion(12) ? ", a.attgenerated" : "") : "");
+        $optionalFields = ($this->_driver()->minVersion(10) ? ",a.attidentity" .
+            ($this->_driver()->minVersion(12) ? ", a.attgenerated" : "") : "");
         $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type,
 pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int,
 col_description(a.attrelid, a.attnum) AS comment$optionalFields
 FROM pg_attribute a LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
 WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
-        foreach ($this->driver->rows($query) as $row)
+        foreach ($this->_driver()->rows($query) as $row)
         {
             $field = $this->makeTableFieldDto($row);
             $fields[$field->name] = $field;
@@ -301,7 +301,7 @@ WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.
     public function indexes(string $table): array
     {
         $tableOid = $this->tableOid($table);
-        $columns = $this->driver->keyValues("SELECT attnum, attname
+        $columns = $this->_driver()->keyValues("SELECT attnum, attname
 FROM pg_attribute WHERE attrelid = $tableOid AND attnum > 0");
 
         $query = "SELECT relname, indisunique::int, indisprimary::int, indkey, indoption, amname,
@@ -309,7 +309,7 @@ pg_get_expr(indpred, indrelid, true) AS partial, pg_get_expr(indexprs, indrelid)
 FROM pg_index JOIN pg_class ON indexrelid = oid JOIN pg_am ON pg_am.oid = pg_class.relam
 WHERE indrelid = $tableOid ORDER BY indisprimary DESC, indisunique DESC";
         $indexes = [];
-        foreach ($this->driver->rows($query) as $row)
+        foreach ($this->_driver()->rows($query) as $row)
         {
             $indexes[$row["relname"]] = $this->makeIndexDto($row, $columns);
         }
@@ -321,13 +321,13 @@ WHERE indrelid = $tableOid ORDER BY indisprimary DESC, indisunique DESC";
      */
     public function foreignKeys(string $table): array
     {
-        $table = $this->driver->quote($table);
+        $table = $this->_driver()->quote($table);
         $foreignKeys = [];
         $query = "SELECT conname, condeferrable::int AS deferrable, pg_get_constraintdef(oid)
 AS definition FROM pg_constraint WHERE conrelid = (SELECT pc.oid FROM pg_class AS pc
 INNER JOIN pg_namespace AS pn ON (pn.oid = pc.relnamespace) WHERE pc.relname = $table
 AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conname";
-        foreach ($this->driver->rows($query) as $row) {
+        foreach ($this->_driver()->rows($query) as $row) {
             $foreignKey = $this->makeForeignKeyDto($row);
             if ($foreignKey !== null) {
                 $foreignKeys[$row['conname']] = $foreignKey;
@@ -342,9 +342,9 @@ AND pn.nspname = current_schema()) AND contype = 'f'::char ORDER BY conkey, conn
     public function checkConstraints(TableDto $status): array
     {
         // From driver.inc.php
-        $database = $this->driver->quote($this->driver->database());
-        $schema = $this->driver->quote($status->schema);
-        $table = $this->driver->quote($status->name);
+        $database = $this->_driver()->quote($this->_driver()->database());
+        $schema = $this->_driver()->quote($status->schema);
+        $table = $this->_driver()->quote($status->name);
         $query = "SELECT c.CONSTRAINT_NAME, c.CHECK_CLAUSE
 FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS c
 JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS t ON c.CONSTRAINT_SCHEMA = t.CONSTRAINT_SCHEMA
@@ -352,7 +352,7 @@ AND c.CONSTRAINT_NAME = t.CONSTRAINT_NAME
 WHERE t.TABLE_CATALOG = $database AND t.TABLE_SCHEMA = $schema AND t.TABLE_NAME = $table
 AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL checks in PostrgreSQL
         // MariaDB contains CHECK_CONSTRAINTS.TABLE_NAME, MySQL and PostrgreSQL not
-        return $this->driver->keyValues($query);
+        return $this->_driver()->keyValues($query);
     }
 
     /**
@@ -360,11 +360,11 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
      */
     public function partitionsInfo(string $table): PartitionDto|null
     {
-        if (!$this->driver->minVersion(10)) {
+        if (!$this->_driver()->minVersion(10)) {
             return null;
         }
         $query = "SELECT * FROM pg_partitioned_table WHERE partrelid = " . $this->tableOid($table);
-        $row = $this->driver->execute($query)?->fetchAssoc();
+        $row = $this->_driver()->execute($query)?->fetchAssoc();
         if (!$row) {
             return null;
         }
@@ -372,8 +372,8 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $partId = $row['partrelid'];
         $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
             str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering
-        $attrs = $this->driver->values($query);
-        $partitionFields = implode(', ', array_map($this->grammar->escapeId(...), $attrs));
+        $attrs = $this->_driver()->values($query);
+        $partitionFields = implode(', ', array_map($this->_grammar()->escapeId(...), $attrs));
 
         $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];
         return new PartitionDto($by[$row['partstrat']], $partitionFields);
@@ -388,15 +388,15 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
             return new TriggerDto('', '', 'EXECUTE PROCEDURE ()');
         }
         if ($table === '') {
-            $table = $this->utils->input->getTable();
+            $table = $this->_utils()->input->getTable();
         }
         $query = 'SELECT t.trigger_name AS "Trigger", t.action_timing AS "Timing", ' .
             '(SELECT STRING_AGG(event_manipulation, \' OR \') FROM information_schema.triggers ' .
             'WHERE event_object_table = t.event_object_table AND trigger_name = t.trigger_name ) AS "Events", ' .
             't.event_manipulation AS "Event", \'FOR EACH \' || t.action_orientation AS "Type", ' .
             't.action_statement AS "Statement" FROM information_schema.triggers t WHERE t.event_object_table = ' .
-            $this->driver->quote($table) . ' AND t.trigger_name = ' . $this->driver->quote($name);
-        $rows = $this->driver->rows($query);
+            $this->_driver()->quote($table) . ' AND t.trigger_name = ' . $this->_driver()->quote($name);
+        $rows = $this->_driver()->rows($query);
         if (!($row = reset($rows))) {
             return null;
         }
@@ -412,8 +412,8 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
     {
         $triggers = [];
         $query = "SELECT * FROM information_schema.triggers WHERE trigger_schema = current_schema() " .
-            "AND event_object_table = " . $this->driver->quote($table);
-        foreach ($this->driver->rows($query) as $row) {
+            "AND event_object_table = " . $this->_driver()->quote($table);
+        foreach ($this->_driver()->rows($query) as $row) {
             $triggers[$row["trigger_name"]] = new TriggerDto($row["action_timing"],
                 $row["event_manipulation"], '', '', $row["trigger_name"]);
         }
@@ -441,7 +441,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
             "information_schema" => "infoschema",
             "pg_catalog" => "catalog",
         ];
-        $link = $links[$this->driver->schema()];
+        $link = $links[$this->_driver()->schema()];
         if ($link) {
             return "$link-" . str_replace("_", "-", $name) . ".html";
         }

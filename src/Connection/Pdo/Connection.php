@@ -37,11 +37,11 @@ class Connection extends AbstractConnection
             return false;
         }
 
-        if ($this->driver->minVersion(9, 0)) {
+        if ($this->_driver()->minVersion(9, 0)) {
             $this->query("SET application_name = 'Jaxon DbAdmin'");
         }
         if (($schema)) {
-            $this->query("SET search_path TO " . $this->grammar->escapeId($schema));
+            $this->query("SET search_path TO " . $this->_grammar()->escapeId($schema));
         }
         return true;
     }

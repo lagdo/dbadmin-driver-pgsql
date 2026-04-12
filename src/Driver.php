@@ -34,9 +34,9 @@ class Driver extends AbstractDriver
     /**
      * @return Grammar
      */
-    public function grammar(): Grammar
+    protected function _grammar(): Grammar
     {
-        return $this->grammar ??= new Grammar($this, $this->utils);
+        return $this->grammar ??= new Grammar($this, $this->_utils());
     }
 
     /**
@@ -44,7 +44,7 @@ class Driver extends AbstractDriver
      */
     protected function _server(): Driver\Server
     {
-        return $this->server ??= new Driver\Server($this, $this->grammar(), $this->utils);
+        return $this->server ??= new Driver\Server($this, $this->_grammar(), $this->_utils());
     }
 
     /**
@@ -52,7 +52,7 @@ class Driver extends AbstractDriver
      */
     protected function _database(): Driver\Database
     {
-        return $this->database ??= new Driver\Database($this, $this->grammar(), $this->utils);
+        return $this->database ??= new Driver\Database($this, $this->_grammar(), $this->_utils());
     }
 
     /**
@@ -60,7 +60,7 @@ class Driver extends AbstractDriver
      */
     protected function _table(): Driver\Table
     {
-        return $this->table ??= new Driver\Table($this, $this->grammar(), $this->utils);
+        return $this->table ??= new Driver\Table($this, $this->_grammar(), $this->_utils());
     }
 
     /**
@@ -68,7 +68,7 @@ class Driver extends AbstractDriver
      */
     protected function _query(): Driver\Query
     {
-        return $this->query ??= new Driver\Query($this, $this->grammar(), $this->utils);
+        return $this->query ??= new Driver\Query($this, $this->_grammar(), $this->_utils());
     }
 
     /**

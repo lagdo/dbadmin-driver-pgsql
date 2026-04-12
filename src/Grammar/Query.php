@@ -15,8 +15,8 @@ class Query extends AbstractQuery
     {
         return preg_match('~^INTO~', $query) ?
             $this->getLimitClause($query, $where, 1, 0) :
-            " $query" . ($this->driver->isView($this->driver->tableStatusOrName($table)) ?
+            " $query" . ($this->_driver()->isView($this->_driver()->tableStatusOrName($table)) ?
                 $where : " WHERE ctid = (SELECT ctid FROM " .
-                    $this->grammar->escapeTableName($table) . $where . ' LIMIT 1)');
+                    $this->_grammar()->escapeTableName($table) . $where . ' LIMIT 1)');
     }
 }

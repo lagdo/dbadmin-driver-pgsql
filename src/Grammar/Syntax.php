@@ -22,8 +22,8 @@ class Syntax extends AbstractSyntax
     public function processAttr(array $process, string $key, string $val): string
     {
         if ($key === "current_query" && $val !== "<IDLE>") {
-            return '<code>' . $this->utils->str->shortenUtf8($val, 50) .
-                '</code>' . $this->utils->trans->lang('Clone');
+            return '<code>' . $this->_utils()->str->shortenUtf8($val, 50) .
+                '</code>' . $this->_utils()->lang('Clone');
         }
         return parent::processAttr($process, $key, $val);
     }
