@@ -1,8 +1,8 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Connection\Traits;
+namespace Lagdo\DbAdmin\Driver\PgSql\Connection\Traits;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\StatementInterface;
 
 use function addcslashes;
 use function array_pad;

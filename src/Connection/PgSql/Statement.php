@@ -1,9 +1,9 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Connection\PgSql;
+namespace Lagdo\DbAdmin\Driver\PgSql\Connection\PgSql;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
-use Lagdo\DbAdmin\Support\Dto\StatementFieldDto;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Dto\StatementFieldDto;
 
 class Statement implements StatementInterface
 {

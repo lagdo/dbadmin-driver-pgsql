@@ -1,11 +1,11 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Driver;
+namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractServer;
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\AbstractConnection;
-use Lagdo\DbAdmin\Support\Exception\AuthException;
-use Lagdo\DbAdmin\Support\PgSql\Connection;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractServer;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\AbstractConnection;
+use Lagdo\DbAdmin\Driver\Exception\AuthException;
+use Lagdo\DbAdmin\Driver\PgSql\Connection;
 
 use function array_map;
 use function count;
@@ -44,7 +44,7 @@ class Server extends AbstractServer
             "date|time" => ["now"],
         ];
         $this->config->editFunctions = [
-            $this->_driver()->numberRegex() => ["+", "-"],
+            $this->_engine()->numberRegex() => ["+", "-"],
             "date|time" => ["+ interval", "- interval"], //! escape
             "char|text" => ["||"],
         ];
@@ -63,18 +63,18 @@ class Server extends AbstractServer
     {
         $trans = $this->_utils()->trans;
         //! get types from current_schemas('t')
-        $userTypes = array_map(fn($type) => (int)$type->oid, $this->_driver()->userTypes(false));
+        $userTypes = array_map(fn($type) => (int)$type->oid, $this->_engine()->userTypes(false));
         if (count($userTypes) > 0) {
             $this->config->types[$trans->lang('User types')] = $userTypes;
         }
 
-        if ($this->_driver()->minVersion(9.2, 0)) {
+        if ($this->_engine()->minVersion(9.2, 0)) {
             $this->config->types[$trans->lang('Strings')]["json"] = 4294967295;
-            if ($this->_driver()->minVersion(9.4, 0)) {
+            if ($this->_engine()->minVersion(9.4, 0)) {
                 $this->config->types[$trans->lang('Strings')]["jsonb"] = 4294967295;
             }
         }
-        if ($this->_driver()->minVersion(12, 0)) {
+        if ($this->_engine()->minVersion(12, 0)) {
             $this->config->generated = ["STORED"];
         }
         $this->config->partitionBy = ["RANGE", "LIST"];
@@ -82,10 +82,10 @@ class Server extends AbstractServer
         //     $this->config->partitionBy[] = "HASH";
         // }
 
-        if ($this->_driver()->minVersion(9.3)) {
+        if ($this->_engine()->minVersion(9.3)) {
             $this->config->features[] = 'materializedview';
         }
-        if ($this->_driver()->minVersion(11)) {
+        if ($this->_engine()->minVersion(11)) {
             $this->config->features[] = 'procedure';
         }
         /*if (connection()->flavor == 'cockroach)*/ {
@@ -101,12 +101,12 @@ class Server extends AbstractServer
     {
         $preferPdo = $options['prefer_pdo'] ?? false;
         if (!$preferPdo && extension_loaded("pgsql")) {
-            return new Connection\PgSql\Connection($this->_driver(),
-                $this->_grammar(), $this->_utils(), $options, 'PgSQL');
+            return new Connection\PgSql\Connection($this->_engine(),
+                $this->_statement(), $this->_utils(), $options, 'PgSQL');
         }
         if (extension_loaded("pdo_pgsql")) {
-            return new Connection\Pdo\Connection($this->_driver(),
-                $this->_grammar(), $this->_utils(), $options, 'PDO_PgSQL');
+            return new Connection\Pdo\Connection($this->_engine(),
+                $this->_statement(), $this->_utils(), $options, 'PDO_PgSQL');
         }
 
         throw new AuthException($this->_utils()->trans
@@ -118,7 +118,7 @@ class Server extends AbstractServer
      */
     public function user(): string
     {
-        return $this->_driver()->result("SELECT user");
+        return $this->_engine()->result("SELECT user");
     }
 
     /**
@@ -126,7 +126,7 @@ class Server extends AbstractServer
      */
     public function schema()
     {
-        return $this->_driver()->result("SELECT current_schema()");
+        return $this->_engine()->result("SELECT current_schema()");
     }
 
     /**
@@ -143,7 +143,7 @@ class Server extends AbstractServer
      */
     public function routineLanguages(): array
     {
-        return $this->_driver()->values("SELECT LOWER(lanname) FROM pg_catalog.pg_language");
+        return $this->_engine()->values("SELECT LOWER(lanname) FROM pg_catalog.pg_language");
     }
 
     /**
@@ -151,7 +151,7 @@ class Server extends AbstractServer
      */
     public function variables(): array
     {
-        return $this->_driver()->keyValues("SHOW ALL");
+        return $this->_engine()->keyValues("SHOW ALL");
     }
 
     /**
@@ -159,8 +159,8 @@ class Server extends AbstractServer
      */
     public function processes(): array
     {
-        return $this->_driver()->rows("SELECT * FROM pg_stat_activity ORDER BY " .
-            ($this->_driver()->minVersion(9.2) ? "pid" : "procpid"));
+        return $this->_engine()->rows("SELECT * FROM pg_stat_activity ORDER BY " .
+            ($this->_engine()->minVersion(9.2) ? "pid" : "procpid"));
     }
 
     /**
@@ -176,7 +176,7 @@ class Server extends AbstractServer
      */
     // public function killProcess($val): bool
     // {
-    //     return $this->_driver()->execute("SELECT pg_terminate_backend(" . $this->_utils()->str->number($val) . ")");
+    //     return $this->_engine()->execute("SELECT pg_terminate_backend(" . $this->_utils()->str->number($val) . ")");
     // }
 
     /**
@@ -184,6 +184,6 @@ class Server extends AbstractServer
      */
     // public function maxConnections(): int
     // {
-    //     return $this->_driver()->result("SHOW max_connections");
+    //     return $this->_engine()->result("SHOW max_connections");
     // }
 }

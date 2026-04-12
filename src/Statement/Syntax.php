@@ -1,8 +1,8 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Grammar;
+namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Grammar\AbstractSyntax;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractSyntax;
 
 use function str_replace;
 

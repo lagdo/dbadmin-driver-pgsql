@@ -1,12 +1,12 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Connection\PgSql;
+namespace Lagdo\DbAdmin\Driver\PgSql\Connection\PgSql;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\AbstractConnection;
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\PreparedStatement;
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
-use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
-use Lagdo\DbAdmin\Support\PgSql\Connection\Traits\ConnectionTrait;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\AbstractConnection;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\PreparedStatement;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\PgSql\Connection\Traits\ConnectionTrait;
 
 use function addcslashes;
 use function pg_affected_rows;
@@ -65,13 +65,13 @@ class Connection extends AbstractConnection
             return false;
         }
 
-        if ($this->_driver()->minVersion(9, 0)) {
+        if ($this->_engine()->minVersion(9, 0)) {
             if (@pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
                 $this->setError(pg_last_error($this->client));
             }
         }
         if (($schema)) {
-            if (@pg_query($this->client, "SET search_path TO " . $this->_grammar()->escapeId($schema)) === false) {
+            if (@pg_query($this->client, "SET search_path TO " . $this->_statement()->escapeId($schema)) === false) {
                 $this->setError(pg_last_error($this->client));
             }
         }
@@ -102,7 +102,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value($value, TableFieldDto $field): mixed
+    public function value(mixed $value, TableFieldDto $field): mixed
     {
         $type = $field->type;
         return $type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value;

@@ -28,7 +28,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Lagdo\\DbAdmin\\Support\\PgSql\\": "src/"
+            "Lagdo\\DbAdmin\\Driver\\PgSql\\": "src/"
         },
         "files": [
             "src/register.php"
@@ -36,7 +36,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Lagdo\\DbAdmin\\Support\\PgSql\\Tests\\": "tests/"
+            "Lagdo\\DbAdmin\\Driver\\PgSql\\Tests\\": "tests/"
         }
     }
 }

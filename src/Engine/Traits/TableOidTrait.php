@@ -1,6 +1,6 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Driver\Traits;
+namespace Lagdo\DbAdmin\Driver\PgSql\Engine\Traits;
 
 trait TableOidTrait
 {
@@ -17,6 +17,6 @@ trait TableOidTrait
     protected function tableOid(string $table): string
     {
         return "(SELECT oid FROM pg_class WHERE relnamespace = {$this->nsOid} AND relname = " .
-            $this->_driver()->quote($table) . " AND relkind IN ('r', 'm', 'v', 'f', 'p'))";
+            $this->_engine()->quote($table) . " AND relkind IN ('r', 'm', 'v', 'f', 'p'))";
     }
 }

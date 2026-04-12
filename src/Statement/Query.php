@@ -1,8 +1,8 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Grammar;
+namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Grammar\AbstractQuery;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractQuery;
 
 use function preg_match;
 
@@ -15,8 +15,8 @@ class Query extends AbstractQuery
     {
         return preg_match('~^INTO~', $query) ?
             $this->getLimitClause($query, $where, 1, 0) :
-            " $query" . ($this->_driver()->isView($this->_driver()->tableStatusOrName($table)) ?
+            " $query" . ($this->_engine()->isView($this->_engine()->tableStatusOrName($table)) ?
                 $where : " WHERE ctid = (SELECT ctid FROM " .
-                    $this->_grammar()->escapeTableName($table) . $where . ' LIMIT 1)');
+                    $this->_statement()->escapeTableName($table) . $where . ' LIMIT 1)');
     }
 }

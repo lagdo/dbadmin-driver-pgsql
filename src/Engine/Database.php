@@ -1,14 +1,14 @@
 <?php
 
-namespace Lagdo\DbAdmin\Support\PgSql\Driver;
+namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
-use Lagdo\DbAdmin\Support\Db\Engine\Connection\StatementInterface;
-use Lagdo\DbAdmin\Support\Db\Engine\Driver\AbstractDatabase;
-use Lagdo\DbAdmin\Support\Dto\FieldType;
-use Lagdo\DbAdmin\Support\Dto\RoutineDto;
-use Lagdo\DbAdmin\Support\Dto\RoutineInfoDto;
-use Lagdo\DbAdmin\Support\Dto\TableFieldDto;
-use Lagdo\DbAdmin\Support\Dto\UserTypeDto;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractDatabase;
+use Lagdo\DbAdmin\Driver\Sql\Dto\FieldType;
+use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineInfoDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\UserTypeDto;
 
 use function array_filter;
 use function array_map;
@@ -38,7 +38,7 @@ class Database extends AbstractDatabase
     {
         $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
             "AND datname not in ('postgres','template0','template1') ORDER BY datname";
-        return $this->_driver()->values($query);
+        return $this->_engine()->values($query);
     }
 
     /**
@@ -46,7 +46,7 @@ class Database extends AbstractDatabase
      */
     public function databaseSize(string $database): int
     {
-        $statement = $this->_driver()->execute("SELECT pg_database_size(" . $this->_driver()->quote($database) . ")");
+        $statement = $this->_engine()->execute("SELECT pg_database_size(" . $this->_engine()->quote($database) . ")");
         if (is_a($statement, StatementInterface::class) && ($row = $statement->fetchRow())) {
             return intval($row[0]);
         }
@@ -58,8 +58,8 @@ class Database extends AbstractDatabase
      */
     public function databaseCollation(string $database, array $collations): string
     {
-        return $this->_driver()->result("SELECT datcollate FROM pg_database WHERE datname = " .
-            $this->_driver()->quote($database));
+        return $this->_engine()->result("SELECT datcollate FROM pg_database WHERE datname = " .
+            $this->_engine()->quote($database));
     }
 
     /**
@@ -85,11 +85,11 @@ class Database extends AbstractDatabase
     public function tables(): array
     {
         $query = 'SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = current_schema()';
-        if ($this->_driver()->support('materializedview')) {
+        if ($this->_engine()->support('materializedview')) {
             $query .= " UNION ALL SELECT matviewname, 'MATERIALIZED VIEW' FROM pg_matviews WHERE schemaname = current_schema()";
         }
         $query .= ' ORDER BY 1';
-        return $this->_driver()->keyValues($query);
+        return $this->_engine()->keyValues($query);
     }
 
     /**
@@ -100,7 +100,7 @@ class Database extends AbstractDatabase
         // From db.inc.php
         $query = 'SELECT sequence_name FROM information_schema.sequences ' .
             'WHERE sequence_schema = selectedSchema() ORDER BY sequence_name';
-        return $this->_driver()->values($query);
+        return $this->_engine()->values($query);
     }
 
     /**
@@ -113,7 +113,7 @@ class Database extends AbstractDatabase
             implode("','", $this->systemSchemas) . "')";
         foreach ($databases as $database) {
             $counts[$database] = 0;
-            $connection = $this->_driver()->newConnection($database); // New connection
+            $connection = $this->_engine()->newConnection($database); // New connection
             if (!$connection) {
                 continue;
             }
@@ -132,7 +132,7 @@ class Database extends AbstractDatabase
     {
         $query = "SELECT nspname FROM pg_namespace WHERE nspname NOT IN ('" .
             implode("','", $this->systemSchemas) . "') ORDER BY nspname";
-        return $this->_driver()->values($query);
+        return $this->_engine()->values($query);
     }
 
     /**
@@ -140,11 +140,11 @@ class Database extends AbstractDatabase
      */
     public function routine(string $name, string $type): RoutineInfoDto|null
     {
-        $quotedName = $this->_driver()->quote($name);
+        $quotedName = $this->_engine()->quote($name);
         $query = 'SELECT routine_definition AS definition, LOWER(external_language) AS language, * ' .
             'FROM information_schema.routines WHERE routine_schema = current_schema() ' .
             "AND specific_name = $quotedName";
-        $rows = $this->_driver()->rows($query);
+        $rows = $this->_engine()->rows($query);
         if (!isset($rows[0])) {
             return null;
         }
@@ -156,7 +156,7 @@ class Database extends AbstractDatabase
         $query = 'SELECT parameter_name AS name, data_type AS type, character_maximum_length AS length, ' .
             'parameter_mode AS inout FROM information_schema.parameters WHERE specific_schema = current_schema() ' .
             "AND specific_name = $quotedName ORDER BY ordinal_position";
-        $rows = $this->_driver()->rows($query);
+        $rows = $this->_engine()->rows($query);
         $paramPosition = 0;
         $params = array_map(function(array $param) use(&$paramPosition) {
             $paramPosition++;
@@ -165,7 +165,7 @@ class Database extends AbstractDatabase
             $length = $param['length'] ?: '';
             $inout = $param['inout'] ?: '';
             return new FieldType(name: $name, type: $type, length: $length, inout: $inout);
-        }, $this->_driver()->rows($query));
+        }, $this->_engine()->rows($query));
 
         return new RoutineInfoDto($definition, $language,
             $params, new FieldType(type: $type));
@@ -179,7 +179,7 @@ class Database extends AbstractDatabase
         $query = 'SELECT specific_name AS "SPECIFIC_NAME", routine_type AS "ROUTINE_TYPE", ' .
             'routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER" ' .
             'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
-        $rows = $this->_driver()->rows($query);
+        $rows = $this->_engine()->rows($query);
         // The ROUTINE_TYPE field can have NULL as value
         return array_map(fn($row) =>
             new RoutineDto($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'],
@@ -195,7 +195,7 @@ class Database extends AbstractDatabase
         foreach ($row['fields'] as $field) {
             $types[] = $field->type;
         }
-        return $this->_grammar()->escapeId($name) . '(' . implode(', ', $types) . ')';
+        return $this->_statement()->escapeId($name) . '(' . implode(', ', $types) . ')';
     }
 
     /**
@@ -205,7 +205,7 @@ class Database extends AbstractDatabase
     {
         $query = "SELECT oid, typname AS name FROM pg_type
 WHERE typnamespace = {$this->nsOid} AND typtype IN ('b','d','e') AND typelem = 0";
-        $rows = $this->_driver()->rows($query);
+        $rows = $this->_engine()->rows($query);
         $types = [];
         foreach ($rows as $row) {
             $types[$row['name']] = new UserTypeDto($row['oid'], $row['name']);
@@ -218,7 +218,7 @@ WHERE typnamespace = {$this->nsOid} AND typtype IN ('b','d','e') AND typelem = 0
         $typeOids = implode("','", array_map(fn($type) => $type->oid, $types));
         $query = "SELECT enumtypid, enumlabel FROM pg_enum
 WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
-        foreach ($this->_driver()->rows($query) as $enum) {
+        foreach ($this->_engine()->rows($query) as $enum) {
             foreach ($types as &$type) {
                 if ($type->oid === $enum['enumtypid']) {
                     $type->enums[] = $enum['enumlabel'];
