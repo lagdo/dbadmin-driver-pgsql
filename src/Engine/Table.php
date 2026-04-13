@@ -54,13 +54,13 @@ class Table extends AbstractTable
     private function makeStatus(array $row): TableDto
     {
         $status = new TableDto($row['Name']);
-        $status->engine = $row['Engine'];
+        $status->engine = $row['Engine'] ?? '';
         $status->schema = $row['nspname'];
         $status->dataLength = $row['Data_length'];
         $status->indexLength = $row['Index_length'];
         $status->oid = $row['Oid'];
-        $status->rows = $row['Rows'];
-        $status->comment = $row['Comment'];
+        $status->rowCount = (int)$row['Rows'];
+        $status->comment = $row['Comment'] ?? '';
 
         return $status;
     }
@@ -96,8 +96,8 @@ class Table extends AbstractTable
 
         $index->type = $this->getIndexType($row);
         $index->name = $row["relname"];
-        $index->algorithm = $row["amname"];
-        $index->partial = $row["partial"];
+        $index->algorithm = $row["amname"] ?? '';
+        $index->partial = $row["partial"] ?? '';
         $indexpr = preg_split('~(?<=\)), (?=\()~', $row["indexpr"] ?? ''); //! '), (' used in expression
         foreach (explode(" ", $row["indkey"]) as $indkey) {
             $index->columns[] = ($indkey ? $columns[$indkey] : array_shift($indexpr));
@@ -264,10 +264,10 @@ class Table extends AbstractTable
         // $field->primary = false;
         $field->nullable = !$row["attnotnull"];
         [$field->length, $field->type, $field->fullType] = $this->getFieldTypes($row);
-        $field->generated = ($row["attgenerated"] ?? '') == "s" ? "STORED" : "";
+        $field->generated = ($row["attgenerated"] ?? '') === "s" ? "STORED" : "";
         $field->privileges = ["insert" => 1, "select" => 1, "update" => 1, "where" => 1, "order" => 1];
         [$field->default, $field->autoIncrement] = $this->getFieldDefault($row);
-        $field->comment = $row["comment"];
+        $field->comment = $row["comment"] ?? '';
 
         return $field;
     }
