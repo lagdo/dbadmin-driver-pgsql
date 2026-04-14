@@ -2,9 +2,9 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
-use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractQuery;
-use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractQuery;
 
 use function array_keys;
 use function implode;

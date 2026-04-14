@@ -2,13 +2,13 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
-use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\StatementInterface;
-use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractDatabase;
+use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
 use Lagdo\DbAdmin\Driver\Sql\Dto\FieldType;
 use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineInfoDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\UserTypeDto;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractDatabase;
 
 use function array_filter;
 use function array_map;

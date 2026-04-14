@@ -2,10 +2,10 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
-use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractServer;
-use Lagdo\DbAdmin\Driver\Sql\Specific\Connection\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Exception\AuthException;
 use Lagdo\DbAdmin\Driver\PgSql\Connection;
+use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractServer;
+use Lagdo\DbAdmin\Driver\Sql\Connection\AbstractConnection;
 
 use function array_map;
 use function count;
