@@ -308,7 +308,6 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     }
 
     /**
-     * @param string $table
      * @param array $fields
      * @param TableDto $status
      *
@@ -322,7 +321,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         // Fields definitions
         foreach ($fields as $field) {
             $clauses[] = $this->_statement()->escapeId($field->name) . ' ' . $field->fullType .
-                $this->getDefaultValueClause($field) . ($field->nullable ? "" : " NOT NULL");
+                $this->_statement()->getDefaultValueClause($field) . ($field->nullable ? "" : " NOT NULL");
         }
 
         $indexes = $this->_engine()->indexes($table);

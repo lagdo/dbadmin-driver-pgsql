@@ -16,7 +16,7 @@ class Server extends AbstractServer
     /**
      * @inheritDoc
      */
-    protected function starting(): void
+    protected function configure(): void
     {
         $trans = $this->_utils()->trans;
         // Init config
