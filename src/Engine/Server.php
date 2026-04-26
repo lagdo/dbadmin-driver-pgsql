@@ -143,7 +143,7 @@ class Server extends AbstractServer
      */
     public function routineLanguages(): array
     {
-        return $this->_engine()->values("SELECT LOWER(lanname) FROM pg_catalog.pg_language");
+        return $this->_engine()->columnValues("SELECT LOWER(lanname) FROM pg_catalog.pg_language");
     }
 
     /**

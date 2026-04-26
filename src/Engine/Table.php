@@ -27,23 +27,56 @@ class Table extends AbstractTable
     use Traits\TableOidTrait;
 
     /**
+     * @var bool|null
+     */
+    private bool|null $hasSize = null;
+
+    /**
      * @param string $table
      *
      * @return array
      */
     private function queryStatus(string $table = ''): array
     {
-        $query = "SELECT c.relname AS \"Name\", CASE c.relkind " .
-            "WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' ELSE 'table' END AS \"Engine\", " .
-            "pg_relation_size(c.oid) AS \"Data_length\", " .
-            "pg_total_relation_size(c.oid) - pg_relation_size(c.oid) AS \"Index_length\", " .
-            "obj_description(c.oid, 'pg_class') AS \"Comment\", " .
-            ($this->_engine()->minVersion(12) ? "''" : "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END") .
-            " AS \"Oid\", c.reltuples as \"Rows\", n.nspname FROM pg_class c " .
-            "JOIN pg_namespace n ON(n.nspname = current_schema() AND n.oid = c.relnamespace) " .
-            "WHERE relkind IN ('r', 'm', 'v', 'f', 'p') " .
-            ($table != "" ? "AND relname = " . $this->_engine()->quote($table) : "ORDER BY relname");
+        // https://github.com/cockroachdb/cockroach/issues/40391
+        $this->hasSize ??= $this->_engine()->columnValue("SELECT 'pg_table_size'::regproc");
+
+        $tableName = $this->_engine()->quote($table);
+        $oidClause = $this->_engine()->minVersion(12) ? "''" :
+            "CASE WHEN c.relhasoids THEN 'oid' ELSE '' END";
+        $query = "SELECT c.relname AS \"Name\",
+CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' ELSE 'table' END AS \"Engine\",
+$oidClause AS \"Oid\", c.reltuples AS \"Rows\",";
+        if ($this->hasSize) {
+            $query .= "
+pg_table_size(c.oid) AS \"Data_length\", pg_indexes_size(c.oid) AS \"Index_length\",";
+        }
+        if ($this->_engine()->minVersion(10)) {
+            $query .= " c.relispartition::int AS partition,";
+        }
+        $query .= "
+current_schema() AS nspname, obj_description(c.oid, 'pg_class') AS \"Comment\"
+FROM pg_class c WHERE c.relkind IN ('r', 'm', 'v', 'f', 'p')
+AND c.relnamespace = {$this->nsOid} " .
+        ($table !== '' ? "AND c.relname = $tableName" : "ORDER BY c.relname");
+
         return $this->_engine()->rows($query);
+    }
+
+    /**
+     * @param array $row
+     * @param string $field
+     *
+     * @return int|null
+     */
+    private function getPositiveInt(array $row, string $field): int|null
+    {
+        if (!isset($row[$field])) {
+            return null;
+        }
+
+        $value = (int)$row[$field];
+        return $value < 0 ? null : $value;
     }
 
     /**
@@ -54,13 +87,15 @@ class Table extends AbstractTable
     private function makeStatus(array $row): TableDto
     {
         $status = new TableDto($row['Name']);
+        $status->oid = $row['Oid'];
         $status->engine = $row['Engine'] ?? '';
         $status->schema = $row['nspname'];
-        $status->dataLength = $row['Data_length'];
-        $status->indexLength = $row['Index_length'];
-        $status->oid = $row['Oid'];
-        $status->rowCount = (int)$row['Rows'];
-        $status->comment = $row['Comment'] ?? '';
+        $status->dataLength = $this->getPositiveInt($row, 'Data_length');
+        $status->indexLength = $this->getPositiveInt($row, 'Index_length');
+        // Not provided.
+        // $status->dataFree = $this->getPositiveInt($row, 'Data_free');
+        $status->rowCount = $this->getPositiveInt($row, 'Rows');
+        $status->comment = $row['Comment'] ?? null;
 
         return $status;
     }
@@ -267,7 +302,7 @@ class Table extends AbstractTable
         $field->generated = ($row["attgenerated"] ?? '') === "s" ? "STORED" : "";
         $field->privileges = ["insert" => 1, "select" => 1, "update" => 1, "where" => 1, "order" => 1];
         [$field->default, $field->autoIncrement] = $this->getFieldDefault($row);
-        $field->comment = $row["comment"] ?? '';
+        $field->comment = $row["comment"] ?? null;
 
         return $field;
     }
@@ -372,7 +407,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $partId = $row['partrelid'];
         $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
             str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering
-        $attrs = $this->_engine()->values($query);
+        $attrs = $this->_engine()->columnValues($query);
         $partitionFields = implode(', ', array_map($this->_statement()->escapeId(...), $attrs));
 
         $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];

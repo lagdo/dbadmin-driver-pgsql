@@ -38,7 +38,7 @@ class Database extends AbstractDatabase
     {
         $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
             "AND datname not in ('postgres','template0','template1') ORDER BY datname";
-        return $this->_engine()->values($query);
+        return $this->_engine()->columnValues($query);
     }
 
     /**
@@ -100,7 +100,7 @@ class Database extends AbstractDatabase
         // From db.inc.php
         $query = 'SELECT sequence_name FROM information_schema.sequences ' .
             'WHERE sequence_schema = selectedSchema() ORDER BY sequence_name';
-        return $this->_engine()->values($query);
+        return $this->_engine()->columnValues($query);
     }
 
     /**
@@ -132,7 +132,7 @@ class Database extends AbstractDatabase
     {
         $query = "SELECT nspname FROM pg_namespace WHERE nspname NOT IN ('" .
             implode("','", $this->systemSchemas) . "') ORDER BY nspname";
-        return $this->_engine()->values($query);
+        return $this->_engine()->columnValues($query);
     }
 
     /**
