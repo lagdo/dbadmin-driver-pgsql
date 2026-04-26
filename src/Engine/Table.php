@@ -121,32 +121,6 @@ AND c.relnamespace = {$this->nsOid} " .
 
     /**
      * @param array $row
-     * @param array $columns
-     *
-     * @return IndexDto
-     */
-    private function makeIndexDto(array $row, array $columns): IndexDto
-    {
-        $index = new IndexDto();
-
-        $index->type = $this->getIndexType($row);
-        $index->name = $row["relname"];
-        $index->algorithm = $row["amname"] ?? '';
-        $index->partial = $row["partial"] ?? '';
-        $indexpr = preg_split('~(?<=\)), (?=\()~', $row["indexpr"] ?? ''); //! '), (' used in expression
-        foreach (explode(" ", $row["indkey"]) as $indkey) {
-            $index->columns[] = ($indkey ? $columns[$indkey] : array_shift($indexpr));
-        }
-        foreach (explode(" ", $row["indoption"]) as $indoption) {
-            $index->descs[] = intval($indoption) & 1 ? '1' : null; // 1 - INDOPTION_DESC
-        }
-        // $index->lengths = [];
-
-        return $index;
-    }
-
-    /**
-     * @param array $row
      *
      * @return ForeignKeyDto|null
      */
@@ -328,6 +302,32 @@ WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.
         }
 
         return $fields;
+    }
+
+    /**
+     * @param array $row
+     * @param array $columns
+     *
+     * @return IndexDto
+     */
+    private function makeIndexDto(array $row, array $columns): IndexDto
+    {
+        $index = new IndexDto();
+
+        $index->type = $this->getIndexType($row);
+        $index->name = $row["relname"];
+        $index->algorithm = $row["amname"] ?? '';
+        $index->partial = $row["partial"] ?? '';
+        $indexpr = preg_split('~(?<=\)), (?=\()~', $row["indexpr"] ?? ''); //! '), (' used in expression
+        foreach (explode(" ", $row["indkey"]) as $indkey) {
+            $index->columns[] = ($indkey ? $columns[$indkey] : array_shift($indexpr));
+        }
+        foreach (explode(" ", $row["indoption"]) as $indoption) {
+            $index->descs[] = intval($indoption) & 1 ? '1' : null; // 1 - INDOPTION_DESC
+        }
+        // $index->lengths = [];
+
+        return $index;
     }
 
     /**
