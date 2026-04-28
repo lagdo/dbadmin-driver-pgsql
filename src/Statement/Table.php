@@ -52,21 +52,21 @@ class Table extends AbstractTable
 
     /**
      * @param string $tableName
-     * @param string $tableComment
+     * @param string|null $tableComment
      * @param array<ColumnDto> $columns
      *
      * @return array<string>
      */
-    private function getTableCommentQueries(string $tableName, string $tableComment, array $columns): array
+    private function getTableCommentQueries(string $tableName, string|null $tableComment, array $columns): array
     {
         $queries = [];
         foreach ($columns as $column) {
-            if ($column->comment !== '') {
+            if ($column->comment !== null) {
                 $comment = substr($column->comment, 9);
                 $queries[] = "COMMENT ON COLUMN $tableName.{$column->name} IS '$comment'";
             }
         }
-        if ($tableComment !== '') {
+        if ($tableComment !== null) {
             $queries[] = "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($tableComment);
         }
         return $queries;
@@ -161,13 +161,13 @@ class Table extends AbstractTable
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
         // Tables columns
-        $columns = [
+        $columns = implode(', ', [
             ...$this->getAddedColumnClauses($table->columns),
             ...$this->getForeignKeyClauses($table, 'ADD '),
-        ];
+        ]);
 
         return [
-            "CREATE TABLE $tableName" . '(' . implode(', ', $columns) . ')',
+            "CREATE TABLE $tableName($columns)",
             ...$this->getTableCommentQueries($tableName, $table->comment, $table->columns),
         ];
     }
@@ -287,28 +287,31 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
     }
 
     /**
-     * @param array $fields
+     * @param array<TableFieldDto> $fields
      * @param TableDto $status
      *
      * @return void
      */
     private function addCommentQueries(array $fields, TableDto $status): void
     {
-        $table = $this->_statement()->escapeId($status->schema) . '.' . $this->_statement()->escapeId($status->name);
+        $table = $this->_statement()->escapeId($status->schema) .
+            '.' . $this->_statement()->escapeId($status->name);
         // Comments for table & fields
-        if ($status->comment) {
-            $this->_tableQueries[] = "\nCOMMENT ON TABLE $table IS " . $this->_engine()->quote($status->comment) . ";";
+        if ($status->comment !== null) {
+            $comment = $this->_engine()->quote($status->comment);
+            $this->_tableQueries[] = "\nCOMMENT ON TABLE $table IS $comment;";
         }
         foreach ($fields as $name => $field) {
-            if ($field->comment) {
-                $this->_tableQueries[] = "\nCOMMENT ON COLUMN $table." . $this->_statement()->escapeId($name) .
-                    " IS " . $this->_engine()->quote($field->comment) . ";";
+            if ($field->comment !== null) {
+                $name = $this->_statement()->escapeId($name);
+                $comment = $this->_engine()->quote($field->comment);
+                $this->_tableQueries[] = "\nCOMMENT ON COLUMN $table.$name IS $comment;";
             }
         }
     }
 
     /**
-     * @param array $fields
+     * @param array<TableFieldDto> $fields
      * @param TableDto $status
      *
      * @return void
@@ -327,7 +330,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         $indexes = $this->_engine()->indexes($table);
         ksort($indexes);
         // Primary + unique keys
-        $escape = fn($column) => $this->_statement()->escapeId($column);
+        $escape = $this->_statement()->escapeId(...);
         foreach ($indexes as $indexName => $index) {
             // Only primary indexes are added here (with the CONSTRAINT keyword).
             if ($index->type === 'PRIMARY') {
