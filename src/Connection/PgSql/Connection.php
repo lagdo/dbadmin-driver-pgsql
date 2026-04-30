@@ -6,7 +6,7 @@ use Lagdo\DbAdmin\Driver\PgSql\Connection\Traits\ConnectionTrait;
 use Lagdo\DbAdmin\Driver\Sql\Connection\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Sql\Connection\PreparedStatement;
 use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
-use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 
 use function addcslashes;
 use function pg_affected_rows;
@@ -102,9 +102,9 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value(mixed $value, TableFieldDto $field): mixed
+    public function value(mixed $value, ColumnDto $column): mixed
     {
-        $type = $field->type;
+        $type = $column->type;
         return $type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value;
     }
 

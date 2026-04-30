@@ -2,8 +2,8 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
-use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractQuery;
 
 use function array_keys;
@@ -28,14 +28,14 @@ class Query extends AbstractQuery
     //                 $where[] = "$key = $val";
     //             }
     //         }
-    //         $updateFields = implode(", ", $update);
+    //         $updateColumns = implode(", ", $update);
     //         $updateFilters = implode(" AND ", $where);
-    //         $insertFields = implode(", ", array_keys($set));
+    //         $insertColumns = implode(", ", array_keys($set));
     //         $insertValues = implode(", ", $set);
     //         if (!(
-    //             ($where && $this->_engine()->execute("UPDATE $tableName SET $updateFields WHERE $updateFilters") &&
+    //             ($where && $this->_engine()->execute("UPDATE $tableName SET $updateColumns WHERE $updateFilters") &&
     //             $this->_engine()->affectedRows()) ||
-    //             $this->_engine()->execute("INSERT INTO $tableName ($insertFields) VALUES ($insertValues)")
+    //             $this->_engine()->execute("INSERT INTO $tableName ($insertColumns) VALUES ($insertValues)")
     //         )) {
     //             return false;
     //         }
@@ -54,12 +54,12 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function convertSearch(string $idf, array $value, TableFieldDto $field): string
+    public function convertSearch(string $idf, array $value, ColumnDto $column): string
     {
         return preg_match('~char|text' .
             (!preg_match('~LIKE~', $value["op"]) ?
                 '|date|time(stamp)?|boolean|uuid|' . $this->_engine()->numberRegex() : '') .
-            '~', $field->type) ? $idf : "CAST($idf AS text)";
+            '~', $column->type) ? $idf : "CAST($idf AS text)";
     }
 
     /**

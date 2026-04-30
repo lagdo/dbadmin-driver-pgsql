@@ -3,10 +3,10 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
 use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
-use Lagdo\DbAdmin\Driver\Sql\Dto\FieldType;
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnType;
 use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineInfoDto;
-use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\UserTypeDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractDatabase;
 
@@ -164,11 +164,11 @@ class Database extends AbstractDatabase
             $type = $param['type'] ?: '';
             $length = $param['length'] ?: '';
             $inout = $param['inout'] ?: '';
-            return new FieldType(name: $name, type: $type, length: $length, inout: $inout);
+            return new ColumnType(name: $name, type: $type, length: $length, inout: $inout);
         }, $this->_engine()->rows($query));
 
         return new RoutineInfoDto($definition, $language,
-            $params, new FieldType(type: $type));
+            $params, new ColumnType(type: $type));
     }
 
     /**
@@ -180,7 +180,7 @@ class Database extends AbstractDatabase
             'routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER" ' .
             'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
         $rows = $this->_engine()->rows($query);
-        // The ROUTINE_TYPE field can have NULL as value
+        // The ROUTINE_TYPE column can have NULL as value
         return array_map(fn($row) =>
             new RoutineDto($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'],
                 $row['ROUTINE_TYPE'] ?: '', $row['DTD_IDENTIFIER']), $rows);
@@ -191,10 +191,7 @@ class Database extends AbstractDatabase
      */
     public function routineId(string $name, array $row): string
     {
-        $types = [];
-        foreach ($row['fields'] as $field) {
-            $types[] = $field->type;
-        }
+        $types = array_map(fn($column) => $column->type, $row['columns']);
         return $this->_statement()->escapeId($name) . '(' . implode(', ', $types) . ')';
     }
 
@@ -232,10 +229,10 @@ WHERE enumtypid IN ('$typeOids') ORDER BY enumsortorder";
     /**
      * @inheritDoc
      */
-    public function enumValues(TableFieldDto $field): array
+    public function enumValues(ColumnDto $column): array
     {
         $types = array_filter(array_values($this->userTypes(true)),
-            fn(UserTypeDto $type) => $type->name === $field->type);
+            fn(UserTypeDto $type) => $type->name === $column->type);
         return isset($types[0]) ? $types[0]->enums : [];
     }
 }

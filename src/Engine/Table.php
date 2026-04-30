@@ -2,11 +2,11 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ForeignKeyDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\IndexDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\PartitionDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
-use Lagdo\DbAdmin\Driver\Sql\Dto\TableFieldDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TriggerDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractTable;
 
@@ -65,17 +65,17 @@ AND c.relnamespace = {$this->nsOid} " .
 
     /**
      * @param array $row
-     * @param string $field
+     * @param string $columnName
      *
      * @return int|null
      */
-    private function getPositiveInt(array $row, string $field): int|null
+    private function getPositiveInt(array $row, string $columnName): int|null
     {
-        if (!isset($row[$field])) {
+        if (!isset($row[$columnName])) {
             return null;
         }
 
-        $value = (int)$row[$field];
+        $value = (int)$row[$columnName];
         return $value < 0 ? null : $value;
     }
 
@@ -209,7 +209,7 @@ AND c.relnamespace = {$this->nsOid} " .
      *
      * @return array
      */
-    private function getFieldTypes(array $row): array
+    private function getColumnTypes(array $row): array
     {
         $aliases = [
             'timestamp without time zone' => 'timestamp',
@@ -240,7 +240,7 @@ AND c.relnamespace = {$this->nsOid} " .
      *
      * @return array
      */
-    private function getFieldDefault(array $row): array
+    private function getColumnDefault(array $row): array
     {
         $default = $row["default"] ?? null;
         $attidentity = $row['attidentity'] ?? '';
@@ -262,46 +262,46 @@ AND c.relnamespace = {$this->nsOid} " .
     /**
      * @param array $row
      *
-     * @return TableFieldDto
+     * @return ColumnDto
      */
-    private function makeTableFieldDto(array $row): TableFieldDto
+    private function makeColumnDto(array $row): ColumnDto
     {
-        $field = new TableFieldDto();
+        $column = new ColumnDto();
 
-        $field->name = $row["field"];
+        $column->name = $row['name'];
         //! No collation, no info about primary keys
-        // $field->primary = false;
-        $field->nullable = !$row["attnotnull"];
-        [$field->length, $field->type, $field->fullType] = $this->getFieldTypes($row);
-        $field->generated = ($row["attgenerated"] ?? '') === "s" ? "STORED" : "";
-        $field->privileges = ["insert" => 1, "select" => 1, "update" => 1, "where" => 1, "order" => 1];
-        [$field->default, $field->autoIncrement] = $this->getFieldDefault($row);
-        $field->comment = $row["comment"] ?? null;
+        // $column->primary = false;
+        $column->nullable = !$row["attnotnull"];
+        [$column->length, $column->type, $column->fullType] = $this->getColumnTypes($row);
+        $column->generated = ($row["attgenerated"] ?? '') === "s" ? "STORED" : "";
+        $column->privileges = ["insert" => 1, "select" => 1, "update" => 1, "where" => 1, "order" => 1];
+        [$column->default, $column->autoIncrement] = $this->getColumnDefault($row);
+        $column->comment = $row["comment"] ?? null;
 
-        return $field;
+        return $column;
     }
 
     /**
      * @inheritDoc
      */
-    public function fields(string $table): array
+    public function columns(string $table): array
     {
-        $fields = [];
+        $columns = [];
         $tableOid = $this->tableOid($table);
-        $optionalFields = ($this->_engine()->minVersion(10) ? ",a.attidentity" .
+        $optionalColumns = ($this->_engine()->minVersion(10) ? ",a.attidentity" .
             ($this->_engine()->minVersion(12) ? ", a.attgenerated" : "") : "");
-        $query = "SELECT a.attname AS field, format_type(a.atttypid, a.atttypmod) AS full_type,
+        $query = "SELECT a.attname AS name, format_type(a.atttypid, a.atttypmod) AS full_type,
 pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int,
-col_description(a.attrelid, a.attnum) AS comment$optionalFields
+col_description(a.attrelid, a.attnum) AS comment$optionalColumns
 FROM pg_attribute a LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
 WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
         foreach ($this->_engine()->rows($query) as $row)
         {
-            $field = $this->makeTableFieldDto($row);
-            $fields[$field->name] = $field;
+            $column = $this->makeColumnDto($row);
+            $columns[$column->name] = $column;
         }
 
-        return $fields;
+        return $columns;
     }
 
     /**
@@ -408,10 +408,10 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
             str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering
         $attrs = $this->_engine()->columnValues($query);
-        $partitionFields = implode(', ', array_map($this->_statement()->escapeId(...), $attrs));
+        $partitionColumns = implode(', ', array_map($this->_statement()->escapeId(...), $attrs));
 
         $by = ['h' => 'HASH', 'l' => 'LIST', 'r' => 'RANGE'];
-        return new PartitionDto($by[$row['partstrat']], $partitionFields);
+        return new PartitionDto($by[$row['partstrat']], $partitionColumns);
     }
 
     /**
