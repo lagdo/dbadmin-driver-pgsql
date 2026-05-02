@@ -69,7 +69,7 @@ class Query extends AbstractQuery
     {
         $query = "EXPLAIN SELECT * FROM " . $this->_statement()->escapeId($tableStatus->name) .
             ($where ? " WHERE " . implode(" AND ", $where) : "");
-        if (preg_match("~ rows=([0-9]+)~", $this->_engine()->result($query), $regs))
+        if (preg_match("~ rows=([0-9]+)~", $this->_engine()->columnValue($query), $regs))
         {
             return $regs[1];
         }
@@ -87,8 +87,8 @@ class Query extends AbstractQuery
             'name' => $name,
             'type' => $type,
             'materialized' => ($type != 'VIEW'),
-            'select' => trim($this->_engine()->result("SELECT pg_get_viewdef(" .
-                $this->_engine()->result("SELECT oid FROM pg_class WHERE relnamespace = " .
+            'select' => trim($this->_engine()->columnValue("SELECT pg_get_viewdef(" .
+                $this->_engine()->columnValue("SELECT oid FROM pg_class WHERE relnamespace = " .
                 "(SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = " .
                 $this->_engine()->quote($name)) . ")") ?? ''),
         ];

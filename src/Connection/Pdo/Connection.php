@@ -4,7 +4,7 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Connection\Pdo;
 
 use Lagdo\DbAdmin\Driver\PgSql\Connection\Traits\ConnectionTrait;
 use Lagdo\DbAdmin\Driver\Sql\Connection\Pdo\AbstractConnection;
-use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Connection\QueryResultInterface;
 
 /**
  * PostgreSQL driver to be used with the pdo_pgsql PHP extension.
@@ -38,10 +38,10 @@ class Connection extends AbstractConnection
         }
 
         if ($this->_engine()->minVersion(9, 0)) {
-            $this->query("SET application_name = 'Jaxon DbAdmin'");
+            $this->executeQuery("SET application_name = 'Jaxon DbAdmin'");
         }
         if (($schema)) {
-            $this->query("SET search_path TO " . $this->_statement()->escapeId($schema));
+            $this->executeQuery("SET search_path TO " . $this->_statement()->escapeId($schema));
         }
         return true;
     }
@@ -57,12 +57,12 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function query(string $query, bool $unbuffered = false): StatementInterface|bool
+    public function executeQuery(string $query, bool $unbuffered = false): QueryResultInterface
     {
-        $result = parent::query($query, $unbuffered);
+        $result = parent::executeQuery($query, $unbuffered);
         if ($this->timeout) {
             $this->timeout = 0;
-            parent::query("RESET statement_timeout");
+            parent::executeQuery("RESET statement_timeout");
         }
         return $result;
     }
@@ -70,7 +70,7 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function nextResult(): mixed
+    public function nextRowset(QueryResultInterface $result): bool
     {
         // PgSQL extension doesn't support multiple results
         return false;

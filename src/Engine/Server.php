@@ -118,7 +118,7 @@ class Server extends AbstractServer
      */
     public function user(): string
     {
-        return $this->_engine()->result("SELECT user");
+        return $this->_engine()->columnValue("SELECT user");
     }
 
     /**
@@ -126,7 +126,7 @@ class Server extends AbstractServer
      */
     public function schema()
     {
-        return $this->_engine()->result("SELECT current_schema()");
+        return $this->_engine()->columnValue("SELECT current_schema()");
     }
 
     /**

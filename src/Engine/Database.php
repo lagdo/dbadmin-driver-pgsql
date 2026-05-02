@@ -2,7 +2,6 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
-use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnType;
 use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineDto;
@@ -17,8 +16,6 @@ use function count;
 use function implode;
 use function intval;
 use function in_array;
-use function is_a;
-use function is_object;
 
 class Database extends AbstractDatabase
 {
@@ -36,8 +33,10 @@ class Database extends AbstractDatabase
      */
     public function databases(bool $flush): array
     {
-        $query = "SELECT datname FROM pg_database WHERE has_database_privilege(datname, 'CONNECT') " .
-            "AND datname not in ('postgres','template0','template1') ORDER BY datname";
+        $query = "SELECT datname FROM pg_database
+WHERE has_database_privilege(datname, 'CONNECT')
+AND datname not in ('postgres','template0','template1')
+ORDER BY datname";
         return $this->_engine()->columnValues($query);
     }
 
@@ -46,11 +45,9 @@ class Database extends AbstractDatabase
      */
     public function databaseSize(string $database): int
     {
-        $statement = $this->_engine()->execute("SELECT pg_database_size(" . $this->_engine()->quote($database) . ")");
-        if (is_a($statement, StatementInterface::class) && ($row = $statement->fetchRow())) {
-            return intval($row[0]);
-        }
-        return 0;
+        $query = "SELECT pg_database_size(" . $this->_engine()->quote($database) . ")";
+        $result = $this->_engine()->executeQuery($query);
+        return $result->hasRowset() && ($row = $result->fetchRow()) ? (int)$row[0] : 0;
     }
 
     /**
@@ -58,7 +55,7 @@ class Database extends AbstractDatabase
      */
     public function databaseCollation(string $database, array $collations): string
     {
-        return $this->_engine()->result("SELECT datcollate FROM pg_database WHERE datname = " .
+        return $this->_engine()->columnValue("SELECT datcollate FROM pg_database WHERE datname = " .
             $this->_engine()->quote($database));
     }
 
@@ -98,8 +95,8 @@ class Database extends AbstractDatabase
     public function sequences(): array
     {
         // From db.inc.php
-        $query = 'SELECT sequence_name FROM information_schema.sequences ' .
-            'WHERE sequence_schema = selectedSchema() ORDER BY sequence_name';
+        $query = "SELECT sequence_name FROM information_schema.sequences
+WHERE sequence_schema = selectedSchema() ORDER BY sequence_name";
         return $this->_engine()->columnValues($query);
     }
 
@@ -117,8 +114,9 @@ class Database extends AbstractDatabase
             if (!$connection) {
                 continue;
             }
-            $statement = $connection->query($query);
-            if (is_object($statement) && ($row = $statement->fetchRow())) {
+
+            $result = $connection->executeQuery($query);
+            if ($result->hasRowset() && ($row = $result->fetchRow())) {
                 $counts[$database] = intval($row[0]);
             }
         }
@@ -130,8 +128,8 @@ class Database extends AbstractDatabase
      */
     public function schemas(): array
     {
-        $query = "SELECT nspname FROM pg_namespace WHERE nspname NOT IN ('" .
-            implode("','", $this->systemSchemas) . "') ORDER BY nspname";
+        $schemas = implode("','", $this->systemSchemas);
+        $query = "SELECT nspname FROM pg_namespace WHERE nspname NOT IN ('$schemas') ORDER BY nspname";
         return $this->_engine()->columnValues($query);
     }
 
@@ -141,9 +139,9 @@ class Database extends AbstractDatabase
     public function routine(string $name, string $type): RoutineInfoDto|null
     {
         $quotedName = $this->_engine()->quote($name);
-        $query = 'SELECT routine_definition AS definition, LOWER(external_language) AS language, * ' .
-            'FROM information_schema.routines WHERE routine_schema = current_schema() ' .
-            "AND specific_name = $quotedName";
+        $query = "SELECT routine_definition AS definition,
+LOWER(external_language) AS language, * FROM information_schema.routines
+WHERE routine_schema = current_schema() AND specific_name = $quotedName";
         $rows = $this->_engine()->rows($query);
         if (!isset($rows[0])) {
             return null;
@@ -153,9 +151,10 @@ class Database extends AbstractDatabase
         $language = $rows[0]['language'];
         $type = $rows[0]['type_udt_name'];
 
-        $query = 'SELECT parameter_name AS name, data_type AS type, character_maximum_length AS length, ' .
-            'parameter_mode AS inout FROM information_schema.parameters WHERE specific_schema = current_schema() ' .
-            "AND specific_name = $quotedName ORDER BY ordinal_position";
+        $query = "SELECT parameter_name AS name, data_type AS type,
+character_maximum_length AS length, parameter_mode AS inout
+FROM information_schema.parameters WHERE specific_schema = current_schema()
+AND specific_name = $quotedName ORDER BY ordinal_position";
         $rows = $this->_engine()->rows($query);
         $paramPosition = 0;
         $params = array_map(function(array $param) use(&$paramPosition) {
@@ -176,9 +175,10 @@ class Database extends AbstractDatabase
      */
     public function routines(): array
     {
-        $query = 'SELECT specific_name AS "SPECIFIC_NAME", routine_type AS "ROUTINE_TYPE", ' .
-            'routine_name AS "ROUTINE_NAME", type_udt_name AS "DTD_IDENTIFIER" ' .
-            'FROM information_schema.routines WHERE routine_schema = current_schema() ORDER BY SPECIFIC_NAME';
+        $query = "SELECT specific_name AS SPECIFIC_NAME, routine_type AS ROUTINE_TYPE,
+routine_name AS ROUTINE_NAME, type_udt_name AS DTD_IDENTIFIER
+FROM information_schema.routines WHERE routine_schema = current_schema()
+ORDER BY SPECIFIC_NAME";
         $rows = $this->_engine()->rows($query);
         // The ROUTINE_TYPE column can have NULL as value
         return array_map(fn($row) =>

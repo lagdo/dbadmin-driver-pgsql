@@ -5,8 +5,10 @@ namespace Lagdo\DbAdmin\Driver\PgSql\Connection\PgSql;
 use Lagdo\DbAdmin\Driver\PgSql\Connection\Traits\ConnectionTrait;
 use Lagdo\DbAdmin\Driver\Sql\Connection\AbstractConnection;
 use Lagdo\DbAdmin\Driver\Sql\Connection\PreparedStatement;
-use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Connection\QueryResultInterface;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
+use PgSql\Connection as PgConnection;
+use PgSql\Result as PgResult;
 
 use function addcslashes;
 use function pg_affected_rows;
@@ -19,10 +21,10 @@ use function pg_query;
 use function pg_set_client_encoding;
 use function pg_unescape_bytea;
 use function pg_version;
-use function uniqid;
 use function pg_prepare;
 use function pg_execute;
-use function pg_last_notice;
+use function sprintf;
+use function uniqid;
 
 /**
  * PostgreSQL driver to be used with the pgsql PHP extension.
@@ -32,14 +34,16 @@ class Connection extends AbstractConnection
     use ConnectionTrait;
 
     /**
-     * @var mixed
+     * The client object used to query the database driver
+     *
+     * @var PgConnection|bool
      */
-    public $result;
+    protected PgConnection|bool $client;
 
     /**
      * @var int
      */
-    public $timeout;
+    public $timeout = 0;
 
     /**
      * @inheritDoc
@@ -51,8 +55,8 @@ class Connection extends AbstractConnection
         $password = addcslashes($this->options['password'], "'\\");
         $database = $this->_database($database);
 
-        $connString = "host='$server' user='$username' password='$password' " .
-            "dbname='$database' connect_timeout=2";
+        $connString = sprintf("host='%s' user='%s' password='%s' dbname='%s' connect_timeout=2",
+            $server, $username, $password, $database);
         $this->client = @pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
         // if (!$this->client && $database != "") {
         //     // try to connect directly with database for performance
@@ -87,6 +91,7 @@ class Connection extends AbstractConnection
         if (!$this->client) {
             return '';
         }
+
         $version = pg_version($this->client);
         return $version["server"];
     }
@@ -102,10 +107,9 @@ class Connection extends AbstractConnection
     /**
      * @inheritDoc
      */
-    public function value(mixed $value, ColumnDto $column): mixed
+    public function convertValue(mixed $value, ColumnDto $column): mixed
     {
-        $type = $column->type;
-        return $type == "bytea" && $value !== null ? pg_unescape_bytea($value) : $value;
+        return $column->type === 'bytea' && $value !== null ? pg_unescape_bytea($value) : $value;
     }
 
     /**
@@ -125,52 +129,39 @@ class Connection extends AbstractConnection
     }
 
     /**
-     * @inheritDoc
+     * @param string $query
+     *
+     * @return QueryResult
      */
-    public function query(string $query, bool $unbuffered = false): StatementInterface|bool
+    private function execQuery(string $query): QueryResultInterface
     {
         $result = @pg_query($this->client, $query);
         $this->setError();
         if ($result === false) {
             $this->setError(pg_last_error($this->client));
-            $statement = false;
-        } elseif (!pg_num_fields($result)) {
+            return new QueryResult(false);
+        }
+
+        if (!pg_num_fields($result)) {
             $this->setAffectedRows(pg_affected_rows($result));
-            $statement = true;
-        } else {
-            $statement = new Statement($result);
+            return new QueryResult(true);
         }
-        if ($this->timeout) {
+
+        return new QueryResult($result);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function executeQuery(string $query, bool $unbuffered = false): QueryResultInterface
+    {
+        $statement = $this->execQuery($query);
+        if ($this->timeout > 0) {
             $this->timeout = 0;
-            $this->query("RESET statement_timeout");
+            $this->execQuery("RESET statement_timeout");
         }
+
         return $statement;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function multiQuery(string $query): bool
-    {
-        $this->statement = $this->query($query);
-        return $this->statement !== false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function storedResult(): StatementInterface|bool
-    {
-        return $this->statement;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function nextResult(): mixed
-    {
-        // PgSQL extension doesn't support multiple results
-        return false;
     }
 
     /**
@@ -179,35 +170,58 @@ class Connection extends AbstractConnection
     public function prepareStatement(string $query): PreparedStatement
     {
         // PgSQL extension uses '$n' as placeholders for query params.
-        $replace = fn($name, $pos) => '$' . $pos;
+        $replace = fn($name, $pos) => "\${$pos}";
         [$params, $query] = $this->getPreparedParams($query, $replace);
         // The prepared statement needs a unique name.
         $name = uniqid('st');
         $statement = pg_prepare($this->client, $name, $query);
-        return new PreparedStatement($query, $statement, $params, $name);
+        return new PreparedStatement($statement, $query, $params, $name);
     }
 
     /**
      * @inheritDoc
      */
-    public function executeStatement(PreparedStatement $statement,
-        array $values): ?StatementInterface
+    public function executeStatement(PreparedStatement $preparedStatement,
+        array $values): QueryResultInterface
     {
-        if (!$statement->prepared()) {
-            return null;
+        /** @var PgResult|bool */
+        $statement = $preparedStatement->statement();
+        if (!$statement) {
+            $this->setError($this->_utils()->lang($this->statementNotPrepared));
+            return new QueryResult(false);
         }
 
-        $values = $statement->paramValues($values, false);
-        $result = pg_execute($this->client, $statement->name(), $values);
-        return !$result ? null : new Statement($result);
+        $values = $preparedStatement->paramValues($values, false);
+        $result = pg_execute($this->client, $preparedStatement->name(), $values);
+        if ($result === false) {
+            $this->setError(pg_last_error($this->client));
+        }
+
+        return new QueryResult($result);
     }
 
     /**
      * @inheritDoc
      */
-    protected function warnings(): string
+    public function executeMultiQuery(string $query): QueryResultInterface
     {
-        // second parameter is available since PHP 7.1.0
-        return $this->_utils()->str->html(pg_last_notice($this->client));
+        return $this->executeQuery($query);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function readRowset(QueryResultInterface $result): QueryResultInterface
+    {
+        return $result;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function nextRowset(QueryResultInterface $result): bool
+    {
+        // PgSQL extension doesn't support multiple results
+        return false;
     }
 }

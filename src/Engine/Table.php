@@ -399,11 +399,12 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
             return null;
         }
         $query = "SELECT * FROM pg_partitioned_table WHERE partrelid = " . $this->tableOid($table);
-        $row = $this->_engine()->execute($query)?->fetchAssoc();
-        if (!$row) {
+        $result = $this->_engine()->executeQuery($query);
+        if ($result->hasError() || $result->rowCount() === 0) {
             return null;
         }
 
+        $row = $result->fetchAssoc();
         $partId = $row['partrelid'];
         $query = "SELECT attname FROM pg_attribute WHERE attrelid = $partId AND attnum IN (" .
             str_replace(' ', ', ', $row['partattrs']) . ')'; //! ordering

@@ -2,7 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Connection\Traits;
 
-use Lagdo\DbAdmin\Driver\Sql\Connection\StatementInterface;
+use Lagdo\DbAdmin\Driver\Sql\Connection\QueryResultInterface;
 
 use function addcslashes;
 use function array_pad;
@@ -50,7 +50,7 @@ trait ConnectionTrait
     /**
      * @inheritDoc
      */
-    public function explain(string $query): StatementInterface|bool
+    public function explain(string $query): QueryResultInterface|bool
     {
         return $this->query("EXPLAIN $query");
     }
