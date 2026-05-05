@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
+use Lagdo\DbAdmin\Driver\Sql\Dto\AbstractTableDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnInputDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableAlterDto;
@@ -11,13 +12,17 @@ use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractTable;
 
 use function array_filter;
 use function array_map;
+use function array_reduce;
 use function array_reverse;
+use function array_values;
 use function count;
 use function implode;
 use function is_string;
 use function ksort;
 use function preg_match;
+use function preg_replace;
 use function rtrim;
+use function substr;
 use function uniqid;
 
 class Table extends AbstractTable
@@ -33,38 +38,24 @@ class Table extends AbstractTable
     private $_primaryIndexName;
 
     /**
-     * @param string $tableName
+     * @param AbstractTableDto $table
      * @param array<ColumnInputDto> $inputs
      *
      * @return array<string>
      */
-    private function getColumnRenameQueries(string $tableName, array $inputs): array
+    private function getTableCommentQueries(AbstractTableDto $table, array $inputs): array
     {
-        $filter = fn(ColumnInputDto $input) => $input->name !== $input->column->name;
-        return array_map(function(ColumnInputDto $input) use($tableName) {
-            $columnName = $this->_statement()->escapeId($input->column->name);
-            return "ALTER TABLE $tableName RENAME $columnName TO {$input->name}";
-        }, array_filter($inputs, $filter));
-    }
-
-    /**
-     * @param string $tableName
-     * @param string|null $tableComment
-     * @param array<ColumnInputDto> $inputs
-     *
-     * @return array<string>
-     */
-    private function getTableCommentQueries(string $tableName, string|null $tableComment, array $inputs): array
-    {
+        $tableName = $this->_statement()->escapeTableName($table->name);
         $filter = fn(ColumnInputDto $input) => $input->comment !== null;
         $queries = array_map(function(ColumnInputDto $input) use($tableName) {
+            $columnName = $this->_statement()->escapeTableName($input->name);
             $comment = substr($input->comment, 9);
-            return "COMMENT ON COLUMN $tableName.{$input->column->name} IS '$comment'";
+            return "COMMENT ON COLUMN $tableName.$columnName IS '{$input->comment}'";
         }, array_filter($inputs, $filter));
 
-        return $tableComment === null ? $queries : [
+        return $table->comment === null ? $queries : [
             ...$queries,
-            "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($tableComment),
+            "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($table->comment),
         ];
     }
 
@@ -76,12 +67,12 @@ class Table extends AbstractTable
      */
     private function getChangedColumnValue(string $tableName, ColumnInputDto $input): string
     {
-        if ($input->defaultValue) {
+        if ($input->default !== null) {
             $pattern = '~GENERATED ALWAYS(.*) STORED~';
-            return "SET" . preg_replace($pattern, 'EXPRESSION\1', $input->defaultValue);
+            return "SET" . preg_replace($pattern, 'EXPRESSION\1', $input->default);
         }
 
-        $sequenceName = "{$tableName}_{$input->column->name}_seq";
+        $sequenceName = "{$tableName}_{$input->name}_seq";
         return $input->autoIncrement ?
             "SET DEFAULT nextval(" . $this->_engine()->quote($sequenceName) . ")" :
             "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
@@ -90,20 +81,21 @@ class Table extends AbstractTable
     /**
      * @param TableAlterDto $table
      *
-     * @return array<string>
+     * @return string
      */
-    private function getTableSequenceQuery(TableAlterDto $table): array
+    private function getTableSequenceQuery(TableAlterDto $table): string
     {
-        foreach ($table->inputs['edited'] as $input) {
-            if ($input->autoIncrement) {
-                $sequenceName = "{$table->name}_{$input->column->name}_seq";
-                $tableName = $this->_statement()->escapeTableName($table->name);
-                return [
-                    "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.{$input->name}",
-                ];
-            }
+        $autoIncrementInputs = array_values(array_filter($table->columns['edited'],
+            fn(ColumnInputDto $input) => $input->autoIncrement));
+        $autoIncrementInput = $autoIncrementInputs[0] ?? null;
+        if ($autoIncrementInput === null) {
+            return '';
         }
-        return [];
+
+        $sequenceName = "{$table->name}_{$autoIncrementInput->name}_seq";
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        $columnName = $this->_statement()->escapeId($autoIncrementInput->name);
+        return "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.$columnName";
     }
 
     /**
@@ -113,19 +105,22 @@ class Table extends AbstractTable
      */
     private function getChangedColumnClauses(TableAlterDto $table): array
     {
-        $clauses = [];
-        foreach ($table->inputs['edited'] as $input) {
+        $columnCb = function(array $clauses, ColumnInputDto $input) use($table) {
+            $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
+            // These queries are execued before the columns rename.
+            // They must then use the current column names.
             $columnName =  $this->_statement()->escapeId($input->column->name);
             $columnValue = $this->getChangedColumnValue($table->name, $input);
-            $nullable = $input->column->nullable ? 'DROP NOT NULL' : 'SET NOT NULL';
-            $clauses = [
+            $nullable = $input->nullable ? 'DROP NOT NULL' : 'SET NOT NULL';
+
+            return [
                 ...$clauses,
-                "ALTER $columnName TYPE{$input->type}",
+                "ALTER $columnName TYPE$type",
                 "ALTER $columnName $columnValue",
                 "ALTER $columnName $nullable",
             ];
-        }
-        return $clauses;
+        };
+        return array_reduce($table->columns['edited'], $columnCb, []);
     }
 
     /**
@@ -136,21 +131,26 @@ class Table extends AbstractTable
      */
     private function getAddedColumnClauses(array $inputs, string $prefix = ''): array
     {
-        $clauses = [];
-        foreach ($inputs as $input) {
-            if ($input->autoIncrement !== null) { // auto increment
+        $columnCb = function(array $clauses, ColumnInputDto $input) use($prefix) {
+            if ($input->autoIncrement) { // auto increment
                 $input->type = match($input->type) {
                     ' bigint' => ' bigserial',
                     ' smallint' => ' smallserial',
                     default => ' serial',
                 };
             }
-            $clauses[] = $prefix . $input->clauses();
-            if ($input->autoIncrement !== null) {
-                $clauses[] = "{$prefix}PRIMARY KEY ({$input->name})";
+            $columnClauses = [$prefix . $this->getAddColumnClause($input)];
+            if ($input->autoIncrement) {
+                $columnName = $this->_statement()->escapeId($input->name);
+                $columnClauses[] = "{$prefix}PRIMARY KEY ($columnName)";
             }
-        }
-        return $clauses;
+
+            return [
+                ...$clauses,
+                ...$columnClauses,
+            ];
+        };
+        return array_reduce($inputs, $columnCb, []);
     }
 
     /**
@@ -160,14 +160,14 @@ class Table extends AbstractTable
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
         // Tables columns
-        $clauses = implode(', ', [
-            ...$this->getAddedColumnClauses($table->inputs['added']),
+        $clauses = implode("\n  ", [
+            ...$this->getAddedColumnClauses($table->columns['added']),
             ...$this->getForeignKeyClauses($table, 'ADD '),
         ]);
 
         return [
-            "CREATE TABLE $tableName($clauses)",
-            ...$this->getTableCommentQueries($tableName, $table->comment, $table->inputs['added']),
+            "CREATE TABLE $tableName(\n  $clauses\n)",
+            ...$this->getTableCommentQueries($table, $table->columns['added']),
         ];
     }
 
@@ -177,31 +177,42 @@ class Table extends AbstractTable
     public function getAlterTableQueries(TableAlterDto $table): array
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
-        $renameTableQuery = [];
+        $tableQueries = [];
+        $sequenceQuery = $this->getTableSequenceQuery($table);
+        if ($sequenceQuery !== '') {
+            $tableQueries[] = $sequenceQuery;
+        }
         if ($table->name !== $table->current->name) {
             $currTableName = $this->_statement()->escapeTableName($table->current->name);
-            $renameTableQuery[] = "ALTER TABLE $currTableName RENAME TO $tableName";
+            $tableQueries[] = "ALTER TABLE $currTableName RENAME TO $tableName";
         }
 
         $droppedColumnClauses = array_map(fn(string $columnName) =>
-            'DROP ' . $this->_statement()->escapeId($columnName), $table->droppedColumns);
-        $clauses =  [
-            ...$this->getAddedColumnClauses($table->inputs['added'], 'ADD '),
+            'DROP ' . $this->_statement()->escapeId($columnName), $table->columns['dropped']);
+        $tableClauses =  [
+            ...$this->getAddedColumnClauses($table->columns['added'], 'ADD '),
             ...$this->getChangedColumnClauses($table),
             ...$droppedColumnClauses,
             ...$this->getForeignKeyClauses($table, 'ADD '),
         ];
-        $alterTableQuery = count($clauses) === 0 ? [] :
-            ["ALTER TABLE $tableName " . implode(', ', $clauses)];
+        if (count($tableClauses) > 0) {
+            $tableQueries[] = "ALTER TABLE $tableName\n  " . implode(",\n  ", $tableClauses);
+        }
+
+        $filter = fn(ColumnInputDto $input) => $input->name !== $input->column->name;
+        $renameColumnsQueries = array_map(function(ColumnInputDto $input) use($tableName) {
+            $currName = $this->_statement()->escapeId($input->column->name);
+            $newName = $this->_statement()->escapeId($input->name);
+
+            return "ALTER TABLE $tableName RENAME $currName TO $newName";
+        }, array_filter($table->columns['edited'], $filter));
 
         return [
-            ...$this->getTableSequenceQuery($table),
-            ...$renameTableQuery,
-            ...$alterTableQuery,
-            ...$this->getColumnRenameQueries($tableName, $table->inputs['edited']),
-            ...$this->getTableCommentQueries($tableName, $table->comment, [
-                ...$table->inputs['added'],
-                ...$table->inputs['edited'],
+            ...$tableQueries,
+            ...array_values($renameColumnsQueries), // Using array_values is important.
+            ...$this->getTableCommentQueries($table, [
+                ...$table->columns['added'],
+                ...$table->columns['edited'],
             ]),
         ];
     }
@@ -323,7 +334,7 @@ WHERE schemaname = current_schema() AND tablename = $tableName $primaryClause";
         // Columns definitions
         foreach ($columns as $column) {
             $clauses[] = $this->_statement()->escapeId($column->name) . ' ' .
-                $column->fullType . $this->_statement()->getDefaultValueClause($column) .
+                $column->fullType . $this->getDefaultValueClause($column) .
                 ($column->nullable ? "" : " NOT NULL");
         }
 

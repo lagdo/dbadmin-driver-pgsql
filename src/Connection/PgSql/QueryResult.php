@@ -41,9 +41,7 @@ class QueryResult implements QueryResultInterface
     {
         $isBool = is_bool($result);
         $this->hasError = $isBool ? !$result : false;
-        if (!$isBool) {
-            $this->result = $result;
-        }
+        $this->result = $isBool ? null : $result;
     }
 
     /**
