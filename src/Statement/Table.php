@@ -22,7 +22,6 @@ use function ksort;
 use function preg_match;
 use function preg_replace;
 use function rtrim;
-use function substr;
 use function uniqid;
 
 class Table extends AbstractTable
@@ -49,8 +48,8 @@ class Table extends AbstractTable
         $filter = fn(ColumnInputDto $input) => $input->comment !== null;
         $queries = array_map(function(ColumnInputDto $input) use($tableName) {
             $columnName = $this->_statement()->escapeTableName($input->name);
-            $comment = substr($input->comment, 9);
-            return "COMMENT ON COLUMN $tableName.$columnName IS '{$input->comment}'";
+            $comment = $this->_engine()->quote($input->comment);
+            return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
         }, array_filter($inputs, $filter));
 
         return $table->comment === null ? $queries : [
