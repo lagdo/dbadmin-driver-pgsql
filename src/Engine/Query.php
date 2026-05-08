@@ -6,43 +6,12 @@ use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractQuery;
 
-use function array_keys;
 use function implode;
 use function preg_match;
 use function strtoupper;
 
 class Query extends AbstractQuery
 {
-    /**
-     * @inheritDoc
-     */
-    // public function insertOrUpdate(string $table, array $rows, array $primary): bool
-    // {
-    //     $tableName = $this->_statement()->escapeTableName($table);
-    //     foreach ($rows as $set) {
-    //         $update = [];
-    //         $where = [];
-    //         foreach ($set as $key => $val) {
-    //             $update[] = "$key = $val";
-    //             if (isset($primary[$this->_statement()->unescapeId($key)])) {
-    //                 $where[] = "$key = $val";
-    //             }
-    //         }
-    //         $updateColumns = implode(", ", $update);
-    //         $updateFilters = implode(" AND ", $where);
-    //         $insertColumns = implode(", ", array_keys($set));
-    //         $insertValues = implode(", ", $set);
-    //         if (!(
-    //             ($where && $this->_engine()->execute("UPDATE $tableName SET $updateColumns WHERE $updateFilters") &&
-    //             $this->_engine()->affectedRows()) ||
-    //             $this->_engine()->execute("INSERT INTO $tableName ($insertColumns) VALUES ($insertValues)")
-    //         )) {
-    //             return false;
-    //         }
-    //     }
-    //     return true;
-    // }
-
     /**
      * @inheritDoc
      */
