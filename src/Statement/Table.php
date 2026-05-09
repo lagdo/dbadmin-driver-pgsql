@@ -2,11 +2,12 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
-use Lagdo\DbAdmin\Driver\Sql\Dto\AbstractTableDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnAction;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnInputDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableAlterDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableCreateDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\TableDdlDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractTable;
 
@@ -37,12 +38,12 @@ class Table extends AbstractTable
     private $_primaryIndexName;
 
     /**
-     * @param AbstractTableDto $table
+     * @param TableDdlDto $table
      * @param array<ColumnInputDto> $inputs
      *
      * @return array<string>
      */
-    private function getTableCommentQueries(AbstractTableDto $table, array $inputs): array
+    private function getTableCommentQueries(TableDdlDto $table, array $inputs): array
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
         $filter = fn(ColumnInputDto $input) => $input->comment !== null;
@@ -64,7 +65,7 @@ class Table extends AbstractTable
      *
      * @return string
      */
-    private function getChangedColumnValue(string $tableName, ColumnInputDto $input): string
+    private function getEditedColumnValue(string $tableName, ColumnInputDto $input): string
     {
         if ($input->default !== null) {
             $pattern = '~GENERATED ALWAYS(.*) STORED~';
@@ -84,7 +85,8 @@ class Table extends AbstractTable
      */
     private function getTableSequenceQuery(TableAlterDto $table): string
     {
-        $autoIncrementInputs = array_values(array_filter($table->columns['edited'],
+        $autoIncrementInputs = array_values(array_filter(
+            $table->columns[ColumnAction::EDIT->value],
             fn(ColumnInputDto $input) => $input->autoIncrement));
         $autoIncrementInput = $autoIncrementInputs[0] ?? null;
         if ($autoIncrementInput === null) {
@@ -102,14 +104,14 @@ class Table extends AbstractTable
      *
      * @return array<string>
      */
-    private function getChangedColumnClauses(TableAlterDto $table): array
+    private function getEditColumnClauses(TableAlterDto $table): array
     {
         $columnCb = function(array $clauses, ColumnInputDto $input) use($table) {
             $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
             // These queries are execued before the columns rename.
             // They must then use the current column names.
             $columnName =  $this->_statement()->escapeId($input->column->name);
-            $columnValue = $this->getChangedColumnValue($table->name, $input);
+            $columnValue = $this->getEditedColumnValue($table->name, $input);
             $nullable = $input->nullable ? 'DROP NOT NULL' : 'SET NOT NULL';
 
             return [
@@ -119,7 +121,7 @@ class Table extends AbstractTable
                 "ALTER $columnName $nullable",
             ];
         };
-        return array_reduce($table->columns['edited'], $columnCb, []);
+        return array_reduce($table->columns[ColumnAction::EDIT->value], $columnCb, []);
     }
 
     /**
@@ -128,7 +130,7 @@ class Table extends AbstractTable
      *
      * @return array<string>
      */
-    private function getAddedColumnClauses(array $inputs, string $prefix = ''): array
+    private function getAddColumnClauses(array $inputs, string $prefix = ''): array
     {
         $columnCb = function(array $clauses, ColumnInputDto $input) use($prefix) {
             if ($input->autoIncrement) { // auto increment
@@ -139,7 +141,7 @@ class Table extends AbstractTable
                 };
             }
             $columnClauses = [$prefix . $this->getAddColumnClause($input)];
-            if ($input->autoIncrement) {
+            if ($input->primary) {
                 $columnName = $this->_statement()->escapeId($input->name);
                 $columnClauses[] = "{$prefix}PRIMARY KEY ($columnName)";
             }
@@ -158,15 +160,16 @@ class Table extends AbstractTable
     public function getCreateTableQueries(TableCreateDto $table): array
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
+        $columns = $table->columns[ColumnAction::ADD->value];
         // Tables columns
         $clauses = implode("\n  ", [
-            ...$this->getAddedColumnClauses($table->columns['added']),
+            ...$this->getAddColumnClauses($columns),
             ...$this->getForeignKeyClauses($table, 'ADD '),
         ]);
 
         return [
             "CREATE TABLE $tableName(\n  $clauses\n)",
-            ...$this->getTableCommentQueries($table, $table->columns['added']),
+            ...$this->getTableCommentQueries($table, $columns),
         ];
     }
 
@@ -187,10 +190,11 @@ class Table extends AbstractTable
         }
 
         $droppedColumnClauses = array_map(fn(string $columnName) =>
-            'DROP ' . $this->_statement()->escapeId($columnName), $table->columns['dropped']);
+            'DROP ' . $this->_statement()->escapeId($columnName),
+                $table->columns[ColumnAction::DROP->value]);
         $tableClauses =  [
-            ...$this->getAddedColumnClauses($table->columns['added'], 'ADD '),
-            ...$this->getChangedColumnClauses($table),
+            ...$this->getAddColumnClauses($table->columns[ColumnAction::ADD->value], 'ADD '),
+            ...$this->getEditColumnClauses($table),
             ...$droppedColumnClauses,
             ...$this->getForeignKeyClauses($table, 'ADD '),
         ];
@@ -204,14 +208,14 @@ class Table extends AbstractTable
             $newName = $this->_statement()->escapeId($input->name);
 
             return "ALTER TABLE $tableName RENAME $currName TO $newName";
-        }, array_filter($table->columns['edited'], $filter));
+        }, array_filter($table->columns[ColumnAction::EDIT->value], $filter));
 
         return [
             ...$tableQueries,
             ...array_values($renameColumnsQueries), // Using array_values is important.
             ...$this->getTableCommentQueries($table, [
-                ...$table->columns['added'],
-                ...$table->columns['edited'],
+                ...$table->columns[ColumnAction::ADD->value],
+                ...$table->columns[ColumnAction::EDIT->value],
             ]),
         ];
     }
