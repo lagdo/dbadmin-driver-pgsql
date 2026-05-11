@@ -48,9 +48,13 @@ class Server extends AbstractServer
             "date|time" => ["+ interval", "- interval"], //! escape
             "char|text" => ["||"],
         ];
-        $this->config->features = ['check', 'columns', 'comment', 'database', 'drop_col', 'dump',
-            'descidx', 'indexes', 'kill', 'partial_indexes', 'routine', 'scheme', 'sequence',
-            'sql', 'table', 'trigger', 'type', 'variables', 'view'];
+        $this->config->features = [
+            'check', 'columns', 'comment', 'database', 'drop_col', 'dump', 'descidx',
+            'indexes', 'kill', 'partial_indexes', 'routine', 'scheme', 'sequence',
+            'sql', 'table', 'trigger', 'type', 'variables', 'view',
+            // Custom additions
+            'table_collation',
+        ];
 
         // Regex to parse SQL statements in a text
         $this->config->sqlStatementRegex = '\\s*|[\'"]|/\*|-- |$|\$[^$]*\$';
