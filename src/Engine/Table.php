@@ -10,12 +10,14 @@ use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TriggerDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractTable;
 
+use function array_combine;
 use function array_map;
 use function array_pad;
 use function explode;
 use function implode;
-use function in_array;
 use function intval;
+use function in_array;
+use function is_a;
 use function preg_match;
 use function preg_replace;
 use function preg_split;
@@ -245,15 +247,17 @@ AND c.relnamespace = {$this->nsOid} " .
         $default = $row["default"] ?? null;
         $attidentity = $row['attidentity'] ?? '';
         if (in_array($attidentity, ['a', 'd'])) {
-            $default = 'GENERATED ' . ($attidentity == 'd' ? 'BY DEFAULT' : 'ALWAYS') . ' AS IDENTITY';
+            $attr = $attidentity === 'd' ? 'BY DEFAULT' : 'ALWAYS';
+            $default = "GENERATED $attr AS IDENTITY";
         }
 
-        $autoIncrement = $attidentity !== '' || $default !== null &&
-            (preg_match('~^nextval\(~i', $default) ||
-            preg_match('~^unique_rowid\(~', $default)); // CockroachDB
+        $autoIncrement = $attidentity !== '' ||
+            ($default !== null && (preg_match('~^nextval\(~i', $default) ||
+                preg_match('~^unique_rowid\(~', $default))); // CockroachDB
 
         if ($default !== null && preg_match('~(.+)::[^,)]+(.*)~', $default, $match)) {
-            $default = $match[1] === "NULL" ? null : $this->_statement()->unescapeId($match[1]) . $match[2];
+            $default = $match[1] === "NULL" ? null :
+                $this->_statement()->unescapeId($match[1]) . $match[2];
         }
 
         return [$default, $autoIncrement];
@@ -261,10 +265,11 @@ AND c.relnamespace = {$this->nsOid} " .
 
     /**
      * @param array $row
+     * @param string|TableDto $table
      *
      * @return ColumnDto
      */
-    private function makeColumnDto(array $row): ColumnDto
+    private function makeColumnDto(array $row, string|TableDto $table): ColumnDto
     {
         $column = new ColumnDto();
 
@@ -278,16 +283,22 @@ AND c.relnamespace = {$this->nsOid} " .
         [$column->default, $column->autoIncrement] = $this->getColumnDefault($row);
         $column->comment = $row["comment"] ?? null;
 
+        if ($column->autoIncrement && is_a($table, TableDto::class)) {
+            $table->autoIncrementColumn = $column->name;
+        }
+
         return $column;
     }
 
     /**
      * @inheritDoc
      */
-    public function columns(string $table): array
+    public function columns(string|TableDto $table): array
     {
+        $tableName = is_a($table, TableDto::class) ? $table->name : $table;
+
         $columns = [];
-        $tableOid = $this->tableOid($table);
+        $tableOid = $this->tableOid($tableName);
         $optionalColumns = ($this->_engine()->minVersion(10) ? ",a.attidentity" .
             ($this->_engine()->minVersion(12) ? ", a.attgenerated" : "") : "");
         $query = "SELECT a.attname AS name, format_type(a.atttypid, a.atttypmod) AS full_type,
@@ -295,13 +306,10 @@ pg_get_expr(d.adbin, d.adrelid) AS default, a.attnotnull::int,
 col_description(a.attrelid, a.attnum) AS comment$optionalColumns
 FROM pg_attribute a LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
 WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.attnum";
-        foreach ($this->_engine()->rows($query) as $row)
-        {
-            $column = $this->makeColumnDto($row);
-            $columns[$column->name] = $column;
-        }
-
-        return $columns;
+        $rows = $this->_engine()->rows($query);
+        $columns = array_map(fn(array $row) => $this->makeColumnDto($row, $table), $rows);
+        // Key by column name.
+        return array_combine(array_map(fn($column) => $column->name, $columns), $columns);
     }
 
     /**
@@ -398,6 +406,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         if (!$this->_engine()->minVersion(10)) {
             return null;
         }
+
         $query = "SELECT * FROM pg_partitioned_table WHERE partrelid = " . $this->tableOid($table);
         $result = $this->_engine()->executeQuery($query);
         if ($result->hasError() || $result->rowCount() === 0) {
@@ -423,6 +432,7 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
         if ($name == '') {
             return new TriggerDto('', '', 'EXECUTE PROCEDURE ()');
         }
+
         if ($table === '') {
             $table = $this->_utils()->input->getTable();
         }
