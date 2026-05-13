@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
+use Lagdo\DbAdmin\Driver\PgSql\Traits\TableTrait;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnType;
 use Lagdo\DbAdmin\Driver\Sql\Dto\RoutineDto;
@@ -19,7 +20,7 @@ use function in_array;
 
 class Database extends AbstractDatabase
 {
-    use Traits\TableOidTrait;
+    use TableTrait;
 
     /**
      * PostgreSQL system schemas

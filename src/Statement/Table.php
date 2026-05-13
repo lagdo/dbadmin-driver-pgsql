@@ -21,12 +21,13 @@ use function count;
 use function implode;
 use function ksort;
 use function preg_match;
-use function preg_replace;
 use function rtrim;
 use function uniqid;
 
 class Table extends AbstractTable
 {
+    use AlterTableTrait;
+
     /**
      * @var array
      */
@@ -38,28 +39,6 @@ class Table extends AbstractTable
     private $_primaryIndexName;
 
     /**
-     * @return string
-     */
-    protected function getEditColumnClause(ColumnInputDto $input): string
-    {
-        $name = $this->_statement()->escapeId($input->name);
-        $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
-
-        $nullValue = $input->nullable ? ' NULL' : ' NOT NULL'; // NULL for timestamp
-        $defaultValue = $this->getDefaultValueClause($input);
-        $autoIncrement = $input->autoIncrement ?
-            $this->_statement()->getAutoIncrementModifier() : '';
-
-        // MariaDB exports CURRENT_TIMESTAMP as a function.
-        $onUpdate = $input->onUpdate === '' || !preg_match('~timestamp|datetime~', $type) ?
-            '' : ' ON UPDATE ' . $this->fixOnUpdateTimestamp($input->onUpdate);
-        $comment = $this->_engine()->support('comment') && $input->comment !== null ?
-            ' COMMENT ' . $this->_engine()->quote($input->comment) : '';
-
-        return "$name$type$nullValue$defaultValue$onUpdate$comment$autoIncrement";
-    }
-
-    /**
      * @param TableDdlDto $table
      * @param array<ColumnInputDto> $inputs
      *
@@ -68,87 +47,18 @@ class Table extends AbstractTable
     private function getTableCommentQueries(TableDdlDto $table, array $inputs): array
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
-        $filter = fn(ColumnInputDto $input) => $input->commentChanged();
+        $filter = fn(ColumnInputDto $input) => $input->hasComment();
         $columnQueries = array_map(function(ColumnInputDto $input) use($tableName) {
             $columnName = $this->_statement()->escapeTableName($input->name);
             $comment = $this->_engine()->quote($input->comment);
             return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
         }, array_filter($inputs, $filter));
 
-        $tableQueries = $table->commentChanged() ? [
+        $tableQueries = $table->hasComment() ? [
             "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($table->comment),
         ] : [];
 
         return [...$columnQueries, ...$tableQueries];
-    }
-
-    /**
-     * @param TableAlterDto $table
-     *
-     * @return string
-     */
-    private function getTableSequenceQuery(TableAlterDto $table): string
-    {
-        $inputsWithAutoIncrement = array_values(array_filter($table->editedColumns(),
-            fn(ColumnInputDto $input) => $input->autoIncrement));
-        $autoIncrementInput = $inputsWithAutoIncrement[0] ?? null;
-        if ($autoIncrementInput === null) {
-            return '';
-        }
-
-        $sequenceName = "{$table->name}_{$autoIncrementInput->name}_seq";
-        $tableName = $this->_statement()->escapeTableName($table->name);
-        $columnName = $this->_statement()->escapeId($autoIncrementInput->name);
-        return "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.$columnName";
-    }
-
-    /**
-     * @param ColumnInputDto $input
-     * @param string $tableName
-     *
-     * @return string
-     */
-    private function getEditedColumnValue(ColumnInputDto $input, string $tableName): string
-    {
-        if ($input->default !== null) {
-            $pattern = '~GENERATED ALWAYS(.*) STORED~';
-            return "SET " . preg_replace($pattern, 'EXPRESSION\1', $input->default);
-        }
-
-        $sequenceName = $this->_engine()->quote("{$tableName}_{$input->name}_seq");
-        return $input->autoIncrement ? "SET DEFAULT nextval($sequenceName)" :
-            "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
-    }
-
-    /**
-     * @param TableAlterDto $table
-     *
-     * @return array<string>
-     */
-    private function getEditColumnClauses(TableAlterDto $table): array
-    {
-        $columnCb = function(array $clauses, ColumnInputDto $input) use($table) {
-            // These queries are execued before the columns rename.
-            // They must then use the current column names.
-            $columnName =  $this->_statement()->escapeId($input->column->name);
-
-            if ($input->typeChanged()) {
-                $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
-                $clauses[] = "ALTER $columnName TYPE $type";
-            }
-            if ($input->valueChanged()) {
-                $columnValue = $this->getEditedColumnValue($input, $table->name);
-                $clauses[] = "ALTER $columnName $columnValue";
-            }
-            if ($input->nullableChanged()) {
-                $nullable = $input->nullable ? 'DROP NOT NULL' : 'SET NOT NULL';
-                $clauses[] = "ALTER $columnName $nullable";
-            }
-
-            return $clauses;
-        };
-
-        return array_reduce($table->editedColumns(), $columnCb, []);
     }
 
     /**
@@ -160,7 +70,8 @@ class Table extends AbstractTable
     private function getAddColumnClauses(array $inputs, string $prefix = ''): array
     {
         $columnCb = function(array $clauses, ColumnInputDto $input) use($prefix) {
-            if ($input->autoIncrement) { // auto increment
+            // This change will automatically add the auto increment constraint.
+            if ($input->autoIncrement) {
                 $input->type = match($input->type) {
                     ' bigint' => ' bigserial',
                     ' smallint' => ' smallserial',
@@ -207,11 +118,10 @@ class Table extends AbstractTable
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
 
-        $sequenceQuery = $this->getTableSequenceQuery($table);
-        $tableQueries = $sequenceQuery !== '' ? [$sequenceQuery] : [];
+        $tableQueries = $this->getAutoIncrementQueries($table);
 
         if ($table->nameChanged()) {
-            $currTableName = $this->_statement()->escapeTableName($table->current->name);
+            $currTableName = $this->_statement()->escapeTableName($table->status->name);
             $tableQueries[] = "ALTER TABLE $currTableName RENAME TO $tableName";
         }
 
@@ -258,8 +168,8 @@ class Table extends AbstractTable
             $tableName = $this->_statement()->escapeId($table->name);
             $constraint = $this->_statement()->escapeId($name);
             $deferrable = $foreignKey->deferrable ? 'DEFERRABLE' : 'NOT DEFERRABLE';
-            return "ALTER TABLE ONLY $tableSchema.$tableName " .
-                "ADD CONSTRAINT $constraint {$foreignKey->definition} $deferrable;";
+            return "ALTER TABLE ONLY $tableSchema.$tableName
+ADD CONSTRAINT $constraint {$foreignKey->definition} $deferrable;";
         }, $foreignKeys, array_values($foreignKeys));
     }
 
@@ -280,8 +190,8 @@ class Table extends AbstractTable
                 $sequenceName = $matches[1];
                 $quotedName = $this->_engine()->quote($sequenceName);
                 $rows = $this->_engine()->rows($this->_engine()->minVersion(10) ?
-                    "SELECT *, cache_size AS cache_value FROM pg_sequences " .
-                        "WHERE schemaname = current_schema() AND sequencename = $quotedName" :
+                    "SELECT *, cache_size AS cache_value FROM pg_sequences
+WHERE schemaname = current_schema() AND sequencename = $quotedName" :
                     "SELECT * FROM $sequenceName");
                 $sequence = reset($rows);
                 if ($style == "DROP+CREATE") {
@@ -294,8 +204,8 @@ class Table extends AbstractTable
                 $lastValue = !($autoIncrement && $sequence['last_value']) ? '' :
                     ' START ' . ((int)$sequence['last_value'] + 1);
                 $cacheValue = $sequence['cache_value'];
-                $this->_tableQueries[] = "CREATE SEQUENCE $sequenceName INCREMENT $incrementBy " .
-                    "MINVALUE $minValue MAXVALUE $maxValue$lastValue CACHE $cacheValue;";
+                $this->_tableQueries[] = "CREATE SEQUENCE $sequenceName INCREMENT $incrementBy
+MINVALUE $minValue MAXVALUE $maxValue$lastValue CACHE $cacheValue;";
                 $this->_tableQueries[] = ''; // Insert an empty line after each sequence.
             }
         }
@@ -412,7 +322,7 @@ WITH (oids = " . ($status->oid ? 'true' : 'false') . ");";
             return rtrim("CREATE VIEW $viewName AS {$view['select']}", ";");
         }
 
-        $columns = $this->_engine()->columns($table);
+        $columns = $status->columns();
         if (empty($columns)) {
             return '';
         }

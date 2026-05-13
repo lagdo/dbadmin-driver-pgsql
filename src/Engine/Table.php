@@ -2,6 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
+use Lagdo\DbAdmin\Driver\PgSql\Traits\TableTrait;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ForeignKeyDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\IndexDto;
@@ -26,7 +27,7 @@ use function trim;
 
 class Table extends AbstractTable
 {
-    use Traits\TableOidTrait;
+    use TableTrait;
 
     /**
      * @var bool|null
@@ -88,7 +89,7 @@ AND c.relnamespace = {$this->nsOid} " .
      */
     private function makeStatus(array $row): TableDto
     {
-        $status = new TableDto($row['Name']);
+        $status = new TableDto($row['Name'], $this->_engine()->columns(...));
         $status->oid = $row['Oid'];
         $status->engine = $row['Engine'] ?? '';
         $status->schema = $row['nspname'];
@@ -158,10 +159,7 @@ AND c.relnamespace = {$this->nsOid} " .
     public function tableStatus(string $table, bool $fast = false): TableDto|null
     {
         $rows = $this->queryStatus($table);
-        if (!($row = reset($rows))) {
-            return null;
-        }
-        return $this->makeStatus($row);
+        return !($row = reset($rows)) ? null : $this->makeStatus($row);
     }
 
     /**
@@ -283,8 +281,13 @@ AND c.relnamespace = {$this->nsOid} " .
         [$column->default, $column->autoIncrement] = $this->getColumnDefault($row);
         $column->comment = $row["comment"] ?? null;
 
-        if ($column->autoIncrement && is_a($table, TableDto::class)) {
+        $sequenceName = is_a($table, TableDto::class) ? $this->getSequenceName($column) : '';
+        if ($sequenceName !== '') {
+            $table->hasAutoIncrement = true;
             $table->autoIncrementColumn = $column->name;
+            $sequenceName = $this->_statement()->escapeTableName($sequenceName);
+            $query = "SELECT last_value FROM $sequenceName";
+            $table->autoIncrementValue = (int)($this->_engine()->columnValue($query) ?? 0);
         }
 
         return $column;
@@ -488,9 +491,6 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
             "pg_catalog" => "catalog",
         ];
         $link = $links[$this->_engine()->schema()];
-        if ($link) {
-            return "$link-" . str_replace("_", "-", $name) . ".html";
-        }
-        return '';
+        return !$link ? '' : "$link-" . str_replace("_", "-", $name) . ".html";
     }
 }

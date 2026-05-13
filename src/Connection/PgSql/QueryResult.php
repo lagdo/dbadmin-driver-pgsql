@@ -94,13 +94,10 @@ class QueryResult implements QueryResultInterface
         }
 
         $column = $this->columnOffset++;
-        $table = pg_field_table($this->result, $column);
-        if (!$table) {
-            return null;
-        }
-
+        $table = pg_field_table($this->result, $column) ?: '';
         $name = pg_field_name($this->result, $column);
         $type = pg_field_type($this->result, $column);
+
         return new ResultColumnDto($type, $type === "bytea", $name, $name, $table, $table);
     }
 
