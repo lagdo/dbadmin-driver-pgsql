@@ -32,122 +32,11 @@ class Table extends AbstractTable
     use TableTrait;
 
     /**
-     * @param TableDdDto $table
-     * @param array<ColumnInputDto> $inputs
-     *
-     * @return array<string>
-     */
-    private function getTableCommentQueries(TableDdDto $table, array $inputs): array
-    {
-        $tableName = $this->_statement()->escapeTableName($table->name);
-        $filter = fn(ColumnInputDto $input) => $input->hasComment();
-        $columnQueries = array_map(function(ColumnInputDto $input) use($tableName) {
-            $columnName = $this->_statement()->escapeTableName($input->name);
-            $comment = $this->_engine()->quote($input->comment);
-            return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
-        }, array_filter($inputs, $filter));
-
-        $tableQueries = $table->hasComment() ? [
-            "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($table->comment),
-        ] : [];
-
-        return [...$columnQueries, ...$tableQueries];
-    }
-
-    /**
-     * @param array<ColumnInputDto> $inputs
-     * @param string $prefix
-     *
-     * @return array<string>
-     */
-    private function getAddColumnClauses(array $inputs, string $prefix = ''): array
-    {
-        $columnCb = function(array $clauses, ColumnInputDto $input) use($prefix) {
-            // This change will automatically add the auto increment constraint.
-            if ($input->autoIncrement) {
-                $input->type = match($input->type) {
-                    ' bigint' => ' bigserial',
-                    ' smallint' => ' smallserial',
-                    default => ' serial',
-                };
-            }
-            $columnClauses = [$prefix . $this->getAddColumnClause($input)];
-            if ($input->primary) {
-                $columnName = $this->_statement()->escapeId($input->name);
-                $columnClauses[] = "{$prefix}PRIMARY KEY ($columnName)";
-            }
-
-            return [
-                ...$clauses,
-                ...$columnClauses,
-            ];
-        };
-        return array_reduce($inputs, $columnCb, []);
-    }
-
-    /**
      * @inheritDoc
      */
-    public function getCreateTableQueries(TableCreateDto $table): array
+    protected function getColumnModifier(ColumnInputDto $input, TableDdDto $table): string
     {
-        $tableName = $this->_statement()->escapeTableName($table->name);
-        $columns = $table->addedColumns();
-        // Tables columns
-        $clauses = implode("\n  ", [
-            ...$this->getAddColumnClauses($columns),
-            ...$this->getForeignKeyClauses($table, 'ADD '),
-        ]);
-
-        return [
-            "CREATE TABLE $tableName(\n  $clauses\n)",
-            ...$this->getTableCommentQueries($table, $columns),
-        ];
-    }
-
-    /**
-     * @param ColumnInputDto $input
-     *
-     * @return string
-     */
-    private function getColumnDefaultClause(ColumnInputDto $input): string
-    {
-        if ($input->default === null) {
-            return "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
-        }
-
-        $regex = '~GENERATED ALWAYS(.*) STORED~';
-        return 'SET ' . preg_replace($regex, 'EXPRESSION\1', $input->default);
-    }
-
-    /**
-     * @param TableAlterDto $table
-     *
-     * @return array<string>
-     */
-    private function getEditColumnClauses(TableAlterDto $table): array
-    {
-        $columnCb = function(array $clauses, ColumnInputDto $input) use($table) {
-            // These queries are execued before the columns rename.
-            // They must then use the current column names.
-            $columnName =  $this->_statement()->escapeId($input->column->name);
-
-            if ($input->typeChanged()) {
-                $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
-                $clauses[] = "ALTER $columnName TYPE $type";
-            }
-            if ($input->defaultChanged() && !$input->autoIncrement) {
-                $defaultValue = $this->getColumnDefaultClause($input);
-                $clauses[] = "ALTER $columnName $defaultValue";
-            }
-            if ($input->nullableChanged()) {
-                $nullable = $input->nullable ? 'DROP NOT NULL' : 'SET NOT NULL';
-                $clauses[] = "ALTER $columnName $nullable";
-            }
-
-            return $clauses;
-        };
-
-        return array_reduce($table->editedColumns(), $columnCb, []);
+        return '';
     }
 
     /**
@@ -255,6 +144,116 @@ class Table extends AbstractTable
     }
 
     /**
+     * @param TableDdDto $table
+     * @param array<ColumnInputDto> $inputs
+     *
+     * @return array<string>
+     */
+    private function getTableCommentQueries(TableDdDto $table, array $inputs): array
+    {
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        $filter = fn(ColumnInputDto $input) => $input->hasComment();
+        $columnQueries = array_map(function(ColumnInputDto $input) use($tableName) {
+            $columnName = $this->_statement()->escapeTableName($input->name);
+            $comment = $this->_engine()->quote($input->comment);
+            return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
+        }, array_filter($inputs, $filter));
+
+        $tableQueries = $table->hasComment() ? [
+            "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($table->comment),
+        ] : [];
+
+        return [...$columnQueries, ...$tableQueries];
+    }
+
+    /**
+     * @param array<ColumnInputDto> $inputs
+     * @param TableDdDto $table
+     * @param string $prefix
+     *
+     * @return array<string>
+     */
+    private function getAddColumnClauses(array $inputs, TableDdDto $table, string $prefix = ''): array
+    {
+        $clauses = array_reduce($inputs, fn(array $clauses, ColumnInputDto $input) => [
+            ...$clauses,
+            $prefix . $this->getAddColumnClause($input, $table),
+        ], []);
+
+        if ($table->primaryKeyColumnCount() > 0) {
+            $clauses[] = $prefix . $table->primaryKeyClause($this->_statement()->escapeId(...));
+        }
+
+        return $clauses;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCreateTableQueries(TableCreateDto $table): array
+    {
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        $columns = $table->addedColumns();
+        // Tables columns
+        $clauses = implode(",\n  ", [
+            ...$this->getAddColumnClauses($columns, $table),
+            ...$this->getForeignKeyClauses($table, 'ADD '),
+        ]);
+
+        return [
+            "CREATE TABLE $tableName(\n  $clauses\n)",
+            ...$this->getAutoIncrementQueries($table),
+            ...$this->getTableCommentQueries($table, $columns),
+        ];
+    }
+
+    /**
+     * @param ColumnInputDto $input
+     *
+     * @return string
+     */
+    private function getColumnDefaultClause(ColumnInputDto $input): string
+    {
+        if ($input->default === null) {
+            return "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
+        }
+
+        $regex = '~GENERATED ALWAYS(.*) STORED~';
+        return 'SET ' . preg_replace($regex, 'EXPRESSION\1', $input->default);
+    }
+
+    /**
+     * @param TableAlterDto $table
+     *
+     * @return array<string>
+     */
+    private function getEditColumnClauses(TableAlterDto $table): array
+    {
+        $columnCb = function(array $clauses, ColumnInputDto $input) use($table) {
+            // These queries are execued before the columns rename.
+            // They must then use the current column names.
+            $columnName =  $this->_statement()->escapeId($input->column->name);
+
+            if ($input->typeChanged()) {
+                $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
+                $clauses[] = "ALTER $columnName TYPE $type";
+            }
+            if ($input->defaultChanged() && !$input->autoIncrement) {
+                $defaultValue = $this->getColumnDefaultClause($input);
+                $clauses[] = "ALTER $columnName $defaultValue";
+            }
+            if ($input->nullableChanged()) {
+                $nullable = $input->nullable ? 'DROP NOT NULL' : 'SET NOT NULL';
+                $clauses[] = "ALTER $columnName $nullable";
+            }
+
+            return $clauses;
+        };
+
+        return array_reduce($table->editedColumns(), $columnCb, []);
+    }
+
+    /**
      * @inheritDoc
      */
     public function getAlterTableQueries(TableAlterDto $table): array
@@ -269,7 +268,7 @@ class Table extends AbstractTable
         }
 
         $tableClauses =  [
-            ...$this->getAddColumnClauses($table->addedColumns(), 'ADD '),
+            ...$this->getAddColumnClauses($table->addedColumns(), $table, 'ADD '),
             ...$this->getEditColumnClauses($table),
             ...$this->getDropColumnClauses($table),
             ...$this->getForeignKeyClauses($table, 'ADD '),

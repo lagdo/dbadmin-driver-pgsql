@@ -7,17 +7,10 @@ use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractDatabase;
 use function array_map;
 use function implode;
 use function preg_match;
+use function strtoupper;
 
 class Database extends AbstractDatabase
 {
-    /**
-     * @inheritDoc
-     */
-    public function getAutoIncrementModifier(): string
-    {
-        return '';
-    }
-
     /**
      * @param string $database
      * @param string $style
