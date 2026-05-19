@@ -284,10 +284,9 @@ AND c.relnamespace = {$this->nsOid} " .
         $sequenceName = is_a($table, TableDto::class) ? $this->getSequenceName($column) : '';
         if ($sequenceName !== '') {
             $table->hasAutoIncrement = true;
-            $table->autoIncrementColumn = $column->name;
             $sequenceName = $this->_statement()->escapeTableName($sequenceName);
             $query = "SELECT last_value FROM $sequenceName";
-            $table->autoIncrementValue = (int)($this->_engine()->columnValue($query) ?? 0);
+            $table->autoIncrement = (int)($this->_engine()->columnValue($query) ?? 0);
         }
 
         return $column;
