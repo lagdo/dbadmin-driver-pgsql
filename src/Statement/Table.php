@@ -3,7 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
 use Lagdo\DbAdmin\Driver\PgSql\Traits\TableTrait;
-use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnInputDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDdDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ForeignKeyDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\IndexDto;
@@ -34,7 +34,7 @@ class Table extends AbstractTable
     /**
      * @inheritDoc
      */
-    protected function getColumnModifier(ColumnInputDto $input, TableDdDto $table): string
+    protected function getColumnModifier(ColumnDdDto $input, TableDdDto $table): string
     {
         return '';
     }
@@ -145,15 +145,15 @@ class Table extends AbstractTable
 
     /**
      * @param TableDdDto $table
-     * @param array<ColumnInputDto> $inputs
+     * @param array<ColumnDdDto> $inputs
      *
      * @return array<string>
      */
     private function getTableCommentQueries(TableDdDto $table, array $inputs): array
     {
         $tableName = $this->_statement()->escapeTableName($table->name);
-        $filter = fn(ColumnInputDto $input) => $input->hasComment();
-        $columnQueries = array_map(function(ColumnInputDto $input) use($tableName) {
+        $filter = fn(ColumnDdDto $input) => $input->hasComment();
+        $columnQueries = array_map(function(ColumnDdDto $input) use($tableName) {
             $columnName = $this->_statement()->escapeTableName($input->name);
             $comment = $this->_engine()->quote($input->comment);
             return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
@@ -167,7 +167,7 @@ class Table extends AbstractTable
     }
 
     /**
-     * @param array<ColumnInputDto> $inputs
+     * @param array<ColumnDdDto> $inputs
      * @param TableDdDto $table
      * @param string $prefix
      *
@@ -175,7 +175,7 @@ class Table extends AbstractTable
      */
     private function getAddColumnClauses(array $inputs, TableDdDto $table, string $prefix = ''): array
     {
-        $clauses = array_reduce($inputs, fn(array $clauses, ColumnInputDto $input) => [
+        $clauses = array_reduce($inputs, fn(array $clauses, ColumnDdDto $input) => [
             ...$clauses,
             $prefix . $this->getAddColumnClause($input, $table),
         ], []);
@@ -208,11 +208,11 @@ class Table extends AbstractTable
     }
 
     /**
-     * @param ColumnInputDto $input
+     * @param ColumnDdDto $input
      *
      * @return string
      */
-    private function getColumnDefaultClause(ColumnInputDto $input): string
+    private function getColumnDefaultClause(ColumnDdDto $input): string
     {
         if ($input->default === null) {
             return "DROP DEFAULT"; //! change to DROP EXPRESSION with generated columns
@@ -229,7 +229,7 @@ class Table extends AbstractTable
      */
     private function getEditColumnClauses(TableAlterDto $table): array
     {
-        $columnCb = function(array $clauses, ColumnInputDto $input) use($table) {
+        $columnCb = function(array $clauses, ColumnDdDto $input) use($table) {
             // These queries are execued before the columns rename.
             // They must then use the current column names.
             $columnName =  $this->_statement()->escapeId($input->column->name);
@@ -277,8 +277,8 @@ class Table extends AbstractTable
             $tableQueries[] = "ALTER TABLE $tableName\n  " . implode(",\n  ", $tableClauses);
         }
 
-        $renameColumnFilter = fn(ColumnInputDto $input) => $input->nameChanged();
-        $renameColumnsQueries = array_map(function(ColumnInputDto $input) use($tableName) {
+        $renameColumnFilter = fn(ColumnDdDto $input) => $input->nameChanged();
+        $renameColumnsQueries = array_map(function(ColumnDdDto $input) use($tableName) {
             $currName = $this->_statement()->escapeId($input->column->name);
             $newName = $this->_statement()->escapeId($input->name);
 
