@@ -44,9 +44,13 @@ class Table extends AbstractTable
      *
      * @return array<string>
      */
-    private function getDisabledAutoIncrementQueries(TableDdDto $table): array
+    private function getRemovedAutoIncrementQueries(TableDdDto $table): array
     {
-        $input = $table->disabledAutoIncrementInput;
+        if (!$table->autoIncrementChanged() || !$table->autoIncrementRemoved()) {
+            return [];
+        }
+
+        $input = $table->removedAutoIncrementInput;
         // Use the previous table and column names.
         $sequenceName = "{$table->statusName()}_{$input->column->name}_seq";
         $sequenceName = $this->_statement()->escapeId($sequenceName);
@@ -64,9 +68,13 @@ class Table extends AbstractTable
      *
      * @return array<string>
      */
-    private function getEnabledAutoIncrementQueries(TableDdDto $table): array
+    private function getAddedAutoIncrementQueries(TableDdDto $table): array
     {
-        $input = $table->enabledAutoIncrementInput;
+        if (!$table->autoIncrementChanged() || !$table->autoIncrementAdded()) {
+            return [];
+        }
+
+        $input = $table->addedAutoIncrementInput;
         $sequenceName = "{$table->name}_{$input->name}_seq";
         $quotedSequenceName = $this->_engine()->quote($sequenceName);
         $sequenceName = $this->_statement()->escapeId($sequenceName);
@@ -93,6 +101,10 @@ class Table extends AbstractTable
      */
     private function getAutoIncrementValueQueries(TableDdDto $table): array
     {
+        if (!$table->autoIncrementChanged() || !$table->autoIncrementValueChanged()) {
+            return [];
+        }
+
         $sequenceName = $this->getSequenceName($table->autoIncrementColumn);
         if ($sequenceName === '') {
             return [];
@@ -111,36 +123,17 @@ class Table extends AbstractTable
      */
     private function getAutoIncrementQueries(TableDdDto $table): array
     {
-        if (!$table->setupAutoIncrement()) {
-            // Nothing to do for auto increment.
+        // This function MUST be called before processing the AI columns.
+        if (!$table->autoIncrementChanged()) {
             return [];
         }
 
-        $queries = [];
-
-        // Drop the current sequence.
-        if ($table->autoIncrementDisabled()) {
-            $queries = [
-                ...$queries,
-                ...$this->getDisabledAutoIncrementQueries($table),
-            ];
-        }
-        // Create a new sequence.
-        if ($table->autoIncrementEnabled()) {
-            $queries = [
-                ...$queries,
-                ...$this->getEnabledAutoIncrementQueries($table),
-            ];
-        }
-        // Just change the current auto increment value.
-        if ($table->autoIncrementValueChanged()) {
-            $queries = [
-                ...$queries,
-                ...$this->getAutoIncrementValueQueries($table),
-            ];
-        }
-
-        return $queries;
+        return [
+            // Create a new sequence.
+            ...$this->getAddedAutoIncrementQueries($table),
+            // Change the current auto increment value.
+            ...$this->getAutoIncrementValueQueries($table),
+        ];
     }
 
     /**
@@ -192,6 +185,8 @@ class Table extends AbstractTable
      */
     public function getCreateTableQueries(TableCreateDto $table): array
     {
+        $table->setupAutoIncrement();
+
         $tableName = $this->_statement()->escapeTableName($table->name);
         $columns = $table->addedColumns();
         // Tables columns
@@ -258,10 +253,11 @@ class Table extends AbstractTable
      */
     public function getAlterTableQueries(TableAlterDto $table): array
     {
+        $table->setupAutoIncrement();
+
         $tableName = $this->_statement()->escapeTableName($table->name);
 
-        $tableQueries = $this->getAutoIncrementQueries($table);
-
+        $tableQueries = [];
         if ($table->nameChanged()) {
             $currTableName = $this->_statement()->escapeTableName($table->status->name);
             $tableQueries[] = "ALTER TABLE $currTableName RENAME TO $tableName";
@@ -288,8 +284,11 @@ class Table extends AbstractTable
         $renameColumnsQueries = array_values($renameColumnsQueries);
 
         return [
+            // Drop the current sequence.
+            ...$this->getRemovedAutoIncrementQueries($table),
             ...$tableQueries,
             ...$renameColumnsQueries,
+            ...$this->getAutoIncrementQueries($table),
             ...$this->getTableCommentQueries($table, [
                 ...$table->addedColumns(),
                 ...$table->editedColumns(),
