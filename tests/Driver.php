@@ -9,7 +9,6 @@ use Lagdo\DbAdmin\Driver\Tests\Db\Fake\Connection;
 use Lagdo\DbAdmin\Driver\PgSql\Engine as PgSqlDriver;
 use Lagdo\DbAdmin\Driver\Utils\Str;
 use Lagdo\DbAdmin\Driver\Utils\Utils;
-use Lagdo\DbAdmin\Driver\Utils\Input;
 
 class Driver extends PgSqlDriver
 {
@@ -20,7 +19,7 @@ class Driver extends PgSqlDriver
      */
     public function __construct()
     {
-        $utils = new Utils(new Translator(), new Input(), new Str());
+        $utils = new Utils(new Translator(), new Str());
         parent::__construct($utils, []);
     }
 

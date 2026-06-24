@@ -3,6 +3,7 @@
 namespace Lagdo\DbAdmin\Driver\PgSql\Engine;
 
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\SelectFilterDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractQuery;
 
@@ -23,12 +24,13 @@ class Query extends AbstractQuery
     /**
      * @inheritDoc
      */
-    public function convertSearch(string $idf, array $value, ColumnDto $column): string
+    public function convertSearch(SelectFilterDto $filter, ColumnDto $column): string
     {
+        $columnName = $this->_statement()->escapeId($column->name);
         return preg_match('~char|text' .
-            (!preg_match('~LIKE~', $value["op"]) ?
+            (!preg_match('~LIKE~', $filter->operator) ?
                 '|date|time(stamp)?|boolean|uuid|' . $this->_engine()->numberRegex() : '') .
-            '~', $column->type) ? $idf : "CAST($idf AS text)";
+            '~', $column->type) ? $columnName : "CAST($columnName AS text)";
     }
 
     /**

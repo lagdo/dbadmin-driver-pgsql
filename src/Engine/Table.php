@@ -129,26 +129,29 @@ AND c.relnamespace = {$this->nsOid} " .
      */
     private function makeForeignKeyDto(array $row): ForeignKeyDto|null
     {
-        if (!preg_match('~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA', $row['definition'], $match)) {
+        $columnRegex = '~FOREIGN KEY\s*\((.+)\)\s*REFERENCES (.+)\((.+)\)(.*)$~iA';
+        if (!preg_match($columnRegex, $row['definition'], $columnMatches)) {
             return null;
         }
 
         $onActions = $this->_engine()->actions();
-        $match = array_pad($match, 5, '');
 
         $foreignKey = new ForeignKeyDto();
         $foreignKey->definition = $row['definition'];
-        $foreignKey->source = array_map(trim(...), explode(',', $match[1]));
-        $foreignKey->target = array_map(trim(...), explode(',', $match[3]));
+        $unescapeId = fn(string $id) => $this->_statement()->unescapeId(trim($id));
+        $foreignKey->source = array_map($unescapeId, explode(',', $columnMatches[1] ?? ''));
+        $foreignKey->target = array_map($unescapeId, explode(',', $columnMatches[3] ?? ''));
 
-        if (preg_match('~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~', $match[2], $match2)) {
-            $match2 = array_pad($match2, 5, '');
-            $foreignKey->schema = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match2[2]));
-            $foreignKey->table = str_replace('""', '"', preg_replace('~^"(.+)"$~', '\1', $match2[4]));
+        $schemaRegex = '~^(("([^"]|"")+"|[^"]+)\.)?"?("([^"]|"")+"|[^"]+)$~';
+        if (preg_match($schemaRegex, $columnMatches[2] ?? '', $schemaMatches)) {
+            $foreignKey->schema = $unescapeId($schemaMatches[2] ?? '');
+            $foreignKey->table = $unescapeId($schemaMatches[4] ?? '');
         }
 
-        $foreignKey->onDelete = preg_match("~ON DELETE ($onActions)~", $match[4], $match2) ? $match2[1] : 'NO ACTION';
-        $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~", $match[4], $match2) ? $match2[1] : 'NO ACTION';
+        $foreignKey->onDelete = preg_match("~ON DELETE ($onActions)~",
+            $columnMatches[4] ?? '', $schemaMatches) ? $schemaMatches[1] : 'NO ACTION';
+        $foreignKey->onUpdate = preg_match("~ON UPDATE ($onActions)~",
+            $columnMatches[4] ?? '', $schemaMatches) ? $schemaMatches[1] : 'NO ACTION';
 
         return $foreignKey;
     }
@@ -429,15 +432,12 @@ AND c.CHECK_CLAUSE NOT LIKE '% IS NOT NULL'"; // ignore default IS NOT NULL chec
     /**
      * @inheritDoc
      */
-    public function trigger(string $name, string $table = ''): TriggerDto|null
+    public function trigger(string $name, string $table): TriggerDto|null
     {
-        if ($name == '') {
+        if ($name === '') {
             return new TriggerDto('', '', 'EXECUTE PROCEDURE ()');
         }
 
-        if ($table === '') {
-            $table = $this->_utils()->input->getTable();
-        }
         $query = 'SELECT t.trigger_name AS "Trigger", t.action_timing AS "Timing", ' .
             '(SELECT STRING_AGG(event_manipulation, \' OR \') FROM information_schema.triggers ' .
             'WHERE event_object_table = t.event_object_table AND trigger_name = t.trigger_name ) AS "Events", ' .
