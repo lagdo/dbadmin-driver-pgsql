@@ -12,15 +12,14 @@ use Lagdo\DbAdmin\Driver\Sql\Dto\TriggerDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Engine\AbstractTable;
 
 use function array_combine;
+use function array_filter;
 use function array_map;
-use function array_pad;
 use function explode;
 use function implode;
 use function intval;
 use function in_array;
 use function is_a;
 use function preg_match;
-use function preg_replace;
 use function preg_split;
 use function str_replace;
 use function trim;
@@ -314,7 +313,17 @@ WHERE a.attrelid = $tableOid AND NOT a.attisdropped AND a.attnum > 0 ORDER BY a.
         $rows = $this->_engine()->rows($query);
         $columns = array_map(fn(array $row) => $this->makeColumnDto($row, $table), $rows);
         // Key by column name.
-        return array_combine(array_map(fn($column) => $column->name, $columns), $columns);
+        $columns = array_combine(array_map(fn($column) => $column->name, $columns), $columns);
+        // Set primary keys.
+        $filter = fn(IndexDto $index) => $index->type === 'PRIMARY';
+        foreach (array_filter($this->indexes($tableName), $filter) as $primaryKey) {
+            foreach ($primaryKey->columns as $primaryKeyColumn) {
+                if (isset($columns[$primaryKeyColumn])) {
+                    $columns[$primaryKeyColumn]->primary = true;
+                }
+            }
+        }
+        return $columns;
     }
 
     /**
