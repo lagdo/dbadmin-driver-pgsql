@@ -12,6 +12,7 @@ use Lagdo\DbAdmin\Driver\Sql\Dto\TableCreateDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDdDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractTable;
+use Exception;
 
 use function array_filter;
 use function array_keys;
@@ -40,166 +41,32 @@ class Table extends AbstractTable
     }
 
     /**
-     * @param TableDdDto $table
-     *
-     * @return array<string>
-     */
-    private function getRemovedAutoIncrementQueries(TableDdDto $table): array
-    {
-        if (!$table->autoIncrementChanged() || !$table->autoIncrementRemoved()) {
-            return [];
-        }
-
-        $input = $table->removedAutoIncrementInput;
-        // Use the previous table and column names.
-        $sequenceName = "{$table->statusName()}_{$input->column->name}_seq";
-        $sequenceName = $this->_statement()->escapeId($sequenceName);
-        $tableName = $this->_statement()->escapeTableName($table->statusName());
-        $columnName = $this->_statement()->escapeId($input->column->name);
-
-        return [
-            "ALTER TABLE $tableName ALTER $columnName DROP DEFAULT",
-            "DROP SEQUENCE IF EXISTS $sequenceName",
-        ];
-    }
-
-    /**
-     * @param TableDdDto $table
-     *
-     * @return array<string>
-     */
-    private function getAddedAutoIncrementQueries(TableDdDto $table): array
-    {
-        if (!$table->autoIncrementChanged() || !$table->autoIncrementAdded()) {
-            return [];
-        }
-
-        $input = $table->addedAutoIncrementInput;
-        $sequenceName = "{$table->name}_{$input->name}_seq";
-        $quotedSequenceName = $this->_engine()->quote($sequenceName);
-        $sequenceName = $this->_statement()->escapeId($sequenceName);
-        // Use the current table and column names.
-        $tableName = $this->_statement()->escapeTableName($table->name);
-        $columnName = $this->_statement()->escapeId($input->name);
-
-        // Empty for a create table query or a new column in an alter table query.
-        $queries = $input->column->name === '' ? [] : [
-            "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.$columnName",
-            "ALTER TABLE $tableName ALTER $columnName SET DEFAULT nextval($quotedSequenceName)",
-        ];
-        if ($table->hasAutoIncrement()) {
-            $queries[] = "SELECT setval($quotedSequenceName, {$table->autoIncrement})";
-        }
-
-        return $queries;
-    }
-
-    /**
-     * @param TableDdDto $table
-     *
-     * @return array<string>
-     */
-    private function getAutoIncrementValueQueries(TableDdDto $table): array
-    {
-        if (!$table->autoIncrementChanged() || !$table->autoIncrementValueChanged()) {
-            return [];
-        }
-
-        $sequenceName = $this->getSequenceName($table->autoIncrementColumn);
-        if ($sequenceName === '') {
-            return [];
-        }
-
-        $quotedSequenceName = $this->_engine()->quote($sequenceName);
-        return [
-            "SELECT setval($quotedSequenceName, {$table->autoIncrement})",
-        ];
-    }
-
-    /**
-     * @param TableDdDto $table
+     * @param TableCreateDto $table
      *
      * @return array
      */
-    private function getAutoIncrementQueries(TableDdDto $table): array
+    private function getCreatePrimaryKeyClause(TableDdDto $table, string $prefix = ''): array
     {
-        // This function MUST be called before processing the AI columns.
-        if (!$table->autoIncrementChanged()) {
+        if (!$table->primaryKeyChanged()) {
             return [];
         }
 
-        return [
-            // Create a new sequence.
-            ...$this->getAddedAutoIncrementQueries($table),
-            // Change the current auto increment value.
-            ...$this->getAutoIncrementValueQueries($table),
-        ];
+        $columns = array_filter($table->columns, fn(ColumnDto $column) => $column->primary);
+        $columnNames = implode(', ', array_map(fn(ColumnDdDto $column) =>
+            $this->_statement()->escapeId($column->name), $columns));
+        return ["{$prefix}PRIMARY KEY ($columnNames)"];
     }
 
     /**
-     * @param TableDdDto $table
-     * @param array<ColumnDdDto> $inputs
-     *
-     * @return array<string>
-     */
-    private function getTableCommentQueries(TableDdDto $table, array $inputs): array
-    {
-        $tableName = $this->_statement()->escapeTableName($table->name);
-        $filter = fn(ColumnDdDto $input) => $input->hasComment();
-        $columnQueries = array_map(function(ColumnDdDto $input) use($tableName) {
-            $columnName = $this->_statement()->escapeTableName($input->name);
-            $comment = $this->_engine()->quote($input->comment);
-            return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
-        }, array_filter($inputs, $filter));
-
-        $tableQueries = $table->hasComment() ? [
-            "COMMENT ON TABLE {$tableName} IS " . $this->_engine()->quote($table->comment),
-        ] : [];
-
-        return [...$columnQueries, ...$tableQueries];
-    }
-
-    /**
-     * @param array<ColumnDdDto> $inputs
      * @param TableDdDto $table
      * @param string $prefix
      *
      * @return array<string>
      */
-    private function getAddColumnClauses(array $inputs, TableDdDto $table, string $prefix = ''): array
+    private function getAddColumnClauses(TableDdDto $table, string $prefix = ''): array
     {
-        $clauses = array_reduce($inputs, fn(array $clauses, ColumnDdDto $input) => [
-            ...$clauses,
-            $prefix . $this->getAddColumnClause($input, $table),
-        ], []);
-
-        if ($table->primaryKeyColumnCount() > 0) {
-            $clauses[] = $prefix . $table->primaryKeyClause($this->_statement()->escapeId(...));
-        }
-
-        return $clauses;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getCreateTableQueries(TableCreateDto $table): array
-    {
-        $table->setupAutoIncrement();
-
-        $tableName = $this->_statement()->escapeTableName($table->name);
-        $columns = $table->addedColumns();
-        // Tables columns
-        $clauses = implode(",\n  ", [
-            ...$this->getAddColumnClauses($columns, $table),
-            ...$this->getForeignKeyClauses($table, 'ADD '),
-        ]);
-
-        return [
-            "CREATE TABLE $tableName(\n  $clauses\n)",
-            ...$this->getAutoIncrementQueries($table),
-            ...$this->getTableCommentQueries($table, $columns),
-        ];
+        return array_map(fn(ColumnDdDto $input) => $prefix .
+            $this->getAddColumnClause($input, $table), $table->addedColumns());
     }
 
     /**
@@ -227,7 +94,7 @@ class Table extends AbstractTable
         $columnCb = function(array $clauses, ColumnDdDto $input) use($table) {
             // These queries are execued before the columns rename.
             // They must then use the current column names.
-            $columnName =  $this->_statement()->escapeId($input->column->name);
+            $columnName =  $this->_statement()->escapeId($input->statusName());
 
             if ($input->typeChanged()) {
                 $type = $this->_statement()->getColumnType($input->typeColumn ?? $input);
@@ -249,46 +116,211 @@ class Table extends AbstractTable
     }
 
     /**
+     * @param TableDdDto $table
+     * @param string $prefix
+     *
+     * @return array<string>
+     */
+    private function getTableClauses(TableDdDto $table, string $prefix = ''): array
+    {
+        return [
+            ...$this->getAddColumnClauses($table, $prefix),
+            ...$this->getEditColumnClauses($table),
+            ...$this->getDropColumnClauses($table),
+            ...$this->getCreatePrimaryKeyClause($table, $prefix),
+            ...$this->getForeignKeyClauses($table, $prefix),
+        ];
+    }
+
+    /**
+     * @param TableDdDto $table
+     * @param array<ColumnDdDto> $inputs
+     *
+     * @return array<string>
+     */
+    private function getTableCommentQueries(TableDdDto $table, array $inputs): array
+    {
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        // Columns queries.
+        $filter = fn(ColumnDdDto $input) => $input->hasComment();
+        $queries = array_map(function(ColumnDdDto $input) use($tableName) {
+            $columnName = $this->_statement()->escapeTableName($input->name);
+            $comment = $this->_engine()->quote($input->comment);
+            return "COMMENT ON COLUMN $tableName.$columnName IS $comment";
+        }, array_filter($inputs, $filter));
+
+        // Table query.
+        if ($table->hasComment()) {
+            $comment = $this->_engine()->quote($table->comment);
+            $queries[] = "COMMENT ON TABLE {$tableName} IS $comment";
+        }
+
+        return $queries;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCreateTableQueries(TableCreateDto $table): array
+    {
+        if ($table->name === '') {
+            throw new Exception($this->_utils()->lang('The table name must be defined.'));
+        }
+
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        $clauses = implode(",\n  ", $this->getTableClauses($table));
+        return [
+            "CREATE TABLE $tableName(\n  $clauses\n)",
+            ...$this->getTableCommentQueries($table, $table->addedColumns()),
+        ];
+    }
+
+    /**
+     * @param TableAlterDto $table
+     *
+     * @return array
+     */
+    private function getDropPrimaryKeyQuery(TableAlterDto $table): array
+    {
+        if (!$table->primaryKeyChanged()) {
+            return [];
+        }
+
+        // Use the previous table name.
+        $constraintName = "{$table->statusName()}_pkey";
+        $constraintName = $this->_statement()->escapeId($constraintName);
+        $tableName = $this->_statement()->escapeTableName($table->statusName());
+        return ["ALTER TABLE $tableName DROP CONSTRAINT $constraintName"];
+    }
+
+    /**
+     * @param TableDdDto $table
+     *
+     * @return array<string>
+     */
+    private function getRemovedAutoIncrementQueries(TableDdDto $table): array
+    {
+        if (!$table->autoIncrementRemoved()) {
+            return [];
+        }
+
+        $input = $table->removedAutoIncrementInput;
+        // Use the previous table and column names.
+        $sequenceName = "{$table->statusName()}_{$input->statusName()}_seq";
+        $sequenceName = $this->_statement()->escapeId($sequenceName);
+        $tableName = $this->_statement()->escapeTableName($table->statusName());
+        $columnName = $this->_statement()->escapeId($input->statusName());
+
+        return [
+            "ALTER TABLE $tableName ALTER $columnName DROP DEFAULT",
+            "DROP SEQUENCE IF EXISTS $sequenceName",
+        ];
+    }
+
+    /**
+     * @param TableAlterDto $table
+     *
+     * @return array<string>
+     */
+    private function getRenameQueries(TableAlterDto $table): array
+    {
+        $tableName = $this->_statement()->escapeTableName($table->statusName());
+
+        // Rename the columns.
+        $renameColumnFilter = fn(ColumnDdDto $input) => $input->nameChanged();
+        // Using array_values() is important for the final merge.
+        $queries = array_values(array_map(function(ColumnDdDto $input) use($tableName) {
+            $currName = $this->_statement()->escapeId($input->statusName());
+            $newName = $this->_statement()->escapeId($input->name);
+
+            return "ALTER TABLE $tableName RENAME $currName TO $newName";
+        }, array_filter($table->editedColumns(), $renameColumnFilter)));
+
+        // Rename the table.
+        if ($table->nameChanged()) {
+            $newName = $this->_statement()->escapeTableName($table->name);
+            $queries[] = "ALTER TABLE $tableName RENAME TO $newName";
+        }
+
+        return $queries;
+    }
+
+    /**
+     * @param TableDdDto $table
+     *
+     * @return array<string>
+     */
+    private function getCreateAutoIncrementQueries(TableDdDto $table): array
+    {
+        if (!$table->autoIncrementAdded()) {
+            return [];
+        }
+
+        $input = $table->addedAutoIncrementInput;
+        // Empty for a new column in an alter table query.
+        if ($input->added()) {
+            return [];
+        }
+
+        $sequenceName = "{$table->name}_{$input->name}_seq";
+        $quotedSequenceName = $this->_engine()->quote($sequenceName);
+        $sequenceName = $this->_statement()->escapeId($sequenceName);
+        // Use the current table and column names.
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        $columnName = $this->_statement()->escapeId($input->name);
+
+        return [
+            "CREATE SEQUENCE IF NOT EXISTS $sequenceName OWNED BY $tableName.$columnName",
+            "ALTER TABLE $tableName ALTER $columnName SET DEFAULT nextval($quotedSequenceName)",
+        ];
+    }
+
+    /**
+     * @param TableDdDto $table
+     *
+     * @return array<string>
+     */
+    private function getAutoIncrementValueQueries(TableDdDto $table): array
+    {
+        $sequenceName = match(true) {
+            !$table->hasAutoIncrement() => '',
+            $table->addedAutoIncrementInput !== null =>
+                "{$table->name}_{$table->addedAutoIncrementInput->name}_seq",
+            ($input = $table->autoIncrementInput()) !== null =>
+                $this->getSequenceName($input->column),
+            default => '',
+        };
+        if ($sequenceName === '') {
+            return [];
+        }
+
+        $sequenceName = $this->_engine()->quote($sequenceName);
+        return ["SELECT setval($sequenceName, {$table->autoIncrement})"];
+    }
+
+    /**
      * @inheritDoc
      */
     public function getAlterTableQueries(TableAlterDto $table): array
     {
-        $table->setupAutoIncrement();
-
-        $tableName = $this->_statement()->escapeTableName($table->name);
-
-        $tableQueries = [];
-        if ($table->nameChanged()) {
-            $currTableName = $this->_statement()->escapeTableName($table->status->name);
-            $tableQueries[] = "ALTER TABLE $currTableName RENAME TO $tableName";
+        if ($table->name === '') {
+            throw new Exception($this->_utils()->lang('The table name must be defined.'));
         }
 
-        $tableClauses =  [
-            ...$this->getAddColumnClauses($table->addedColumns(), $table, 'ADD '),
-            ...$this->getEditColumnClauses($table),
-            ...$this->getDropColumnClauses($table),
-            ...$this->getForeignKeyClauses($table, 'ADD '),
-        ];
-        if (count($tableClauses) > 0) {
-            $tableQueries[] = "ALTER TABLE $tableName\n  " . implode(",\n  ", $tableClauses);
+        $queries = [];
+        $clauses = $this->getTableClauses($table, 'ADD ');
+        if (count($clauses) > 0) {
+            $tableName = $this->_statement()->escapeTableName($table->name);
+            $queries[] = "ALTER TABLE $tableName\n  " . implode(",\n  ", $clauses);
         }
-
-        $renameColumnFilter = fn(ColumnDdDto $input) => $input->nameChanged();
-        $renameColumnsQueries = array_map(function(ColumnDdDto $input) use($tableName) {
-            $currName = $this->_statement()->escapeId($input->column->name);
-            $newName = $this->_statement()->escapeId($input->name);
-
-            return "ALTER TABLE $tableName RENAME $currName TO $newName";
-        }, array_filter($table->editedColumns(), $renameColumnFilter));
-        // Using array_values() is important for the final merge.
-        $renameColumnsQueries = array_values($renameColumnsQueries);
 
         return [
-            // Drop the current sequence.
+            ...$this->getDropPrimaryKeyQuery($table),
             ...$this->getRemovedAutoIncrementQueries($table),
-            ...$tableQueries,
-            ...$renameColumnsQueries,
-            ...$this->getAutoIncrementQueries($table),
+            ...$this->getRenameQueries($table),
+            ...$queries,
+            ...$this->getCreateAutoIncrementQueries($table),
+            ...$this->getAutoIncrementValueQueries($table),
             ...$this->getTableCommentQueries($table, [
                 ...$table->addedColumns(),
                 ...$table->editedColumns(),
