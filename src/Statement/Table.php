@@ -117,23 +117,6 @@ class Table extends AbstractTable
 
     /**
      * @param TableDdDto $table
-     * @param string $prefix
-     *
-     * @return array<string>
-     */
-    private function getTableClauses(TableDdDto $table, string $prefix = ''): array
-    {
-        return [
-            ...$this->getAddColumnClauses($table, $prefix),
-            ...$this->getEditColumnClauses($table),
-            ...$this->getDropColumnClauses($table),
-            ...$this->getCreatePrimaryKeyClause($table, $prefix),
-            ...$this->getForeignKeyClauses($table, $prefix),
-        ];
-    }
-
-    /**
-     * @param TableDdDto $table
      * @param array<ColumnDdDto> $inputs
      *
      * @return array<string>
@@ -168,9 +151,13 @@ class Table extends AbstractTable
         }
 
         $tableName = $this->_statement()->escapeTableName($table->name);
-        $clauses = implode(",\n  ", $this->getTableClauses($table));
+        $clauses = implode(",\n  ", [
+            ...$this->getAddColumnClauses($table),
+            ...$this->getCreatePrimaryKeyClause($table),
+            ...$this->getForeignKeyClauses($table),
+        ]);
         return [
-            "CREATE TABLE $tableName(\n  $clauses\n)",
+            "CREATE TABLE $tableName (\n  $clauses\n)",
             ...$this->getTableCommentQueries($table, $table->addedColumns()),
         ];
     }
@@ -299,6 +286,28 @@ class Table extends AbstractTable
     }
 
     /**
+     * @param TableAlterDto $table
+     *
+     * @return array
+     */
+    private function getAlterTableQuery(TableAlterDto $table): array
+    {
+        $clauses = [
+            ...$this->getAddColumnClauses($table, 'ADD '),
+            ...$this->getEditColumnClauses($table),
+            ...$this->getDropColumnClauses($table),
+            ...$this->getCreatePrimaryKeyClause($table, 'ADD '),
+            ...$this->getForeignKeyClauses($table, 'ADD '),
+        ];
+        if (count($clauses) === 0) {
+            return [];
+        }
+
+        $tableName = $this->_statement()->escapeTableName($table->name);
+        return ["ALTER TABLE $tableName\n  " . implode(",\n  ", $clauses)];
+    }
+
+    /**
      * @inheritDoc
      */
     public function getAlterTableQueries(TableAlterDto $table): array
@@ -307,18 +316,11 @@ class Table extends AbstractTable
             throw new Exception($this->_utils()->lang('The table name must be defined.'));
         }
 
-        $queries = [];
-        $clauses = $this->getTableClauses($table, 'ADD ');
-        if (count($clauses) > 0) {
-            $tableName = $this->_statement()->escapeTableName($table->name);
-            $queries[] = "ALTER TABLE $tableName\n  " . implode(",\n  ", $clauses);
-        }
-
         return [
             ...$this->getDropPrimaryKeyQuery($table),
             ...$this->getRemovedAutoIncrementQueries($table),
             ...$this->getRenameQueries($table),
-            ...$queries,
+            ...$this->getAlterTableQuery($table),
             ...$this->getCreateAutoIncrementQueries($table),
             ...$this->getAutoIncrementValueQueries($table),
             ...$this->getTableCommentQueries($table, [
