@@ -2,7 +2,7 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
-use Lagdo\DbAdmin\Driver\Exception\DbException;
+use Lagdo\DbAdmin\Driver\Exception\DriverException;
 use Lagdo\DbAdmin\Driver\PgSql\Traits\TableTrait;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDdDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
@@ -131,7 +131,7 @@ class Table extends AbstractTable
     public function getCreateTableQueries(TableCreateDto $table): array
     {
         if ($table->name === '') {
-            throw new DbException($this->_utils()->lang('The table name must be defined.'));
+            throw new DriverException($this->_utils()->lang('The table name must be defined.'));
         }
 
         $tableName = $this->_statement()->escapeTableName($table->name);
@@ -317,7 +317,7 @@ class Table extends AbstractTable
     public function getAlterTableQueries(TableAlterDto $table): array
     {
         if ($table->name === '') {
-            throw new DbException($this->_utils()->lang('The table name must be defined.'));
+            throw new DriverException($this->_utils()->lang('The table name must be defined.'));
         }
 
         return [
