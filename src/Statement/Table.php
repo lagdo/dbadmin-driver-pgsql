@@ -2,9 +2,11 @@
 
 namespace Lagdo\DbAdmin\Driver\PgSql\Statement;
 
+use Lagdo\DbAdmin\Driver\Exception\DbException;
 use Lagdo\DbAdmin\Driver\PgSql\Traits\TableTrait;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDdDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\ForeignKeyDdDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ForeignKeyDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\IndexDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableAlterDto;
@@ -12,7 +14,6 @@ use Lagdo\DbAdmin\Driver\Sql\Dto\TableCreateDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDdDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
 use Lagdo\DbAdmin\Driver\Sql\Specific\Statement\AbstractTable;
-use Exception;
 
 use function array_filter;
 use function array_keys;
@@ -38,23 +39,6 @@ class Table extends AbstractTable
     protected function getColumnModifier(ColumnDdDto $input, TableDdDto $table): string
     {
         return '';
-    }
-
-    /**
-     * @param TableCreateDto $table
-     *
-     * @return array
-     */
-    private function getCreatePrimaryKeyClause(TableDdDto $table, string $prefix = ''): array
-    {
-        if (!$table->primaryKeyChanged()) {
-            return [];
-        }
-
-        $columns = array_filter($table->columns, fn(ColumnDto $column) => $column->primary);
-        $columnNames = implode(', ', array_map(fn(ColumnDdDto $column) =>
-            $this->_statement()->escapeId($column->name), $columns));
-        return ["{$prefix}PRIMARY KEY ($columnNames)"];
     }
 
     /**
@@ -147,14 +131,14 @@ class Table extends AbstractTable
     public function getCreateTableQueries(TableCreateDto $table): array
     {
         if ($table->name === '') {
-            throw new Exception($this->_utils()->lang('The table name must be defined.'));
+            throw new DbException($this->_utils()->lang('The table name must be defined.'));
         }
 
         $tableName = $this->_statement()->escapeTableName($table->name);
         $clauses = implode(",\n  ", [
             ...$this->getAddColumnClauses($table),
             ...$this->getCreatePrimaryKeyClause($table),
-            ...$this->getForeignKeyClauses($table),
+            ...$this->getCreateForeignKeyClauses($table),
         ]);
         return [
             "CREATE TABLE $tableName (\n  $clauses\n)",
@@ -163,21 +147,41 @@ class Table extends AbstractTable
     }
 
     /**
-     * @param TableAlterDto $table
-     *
-     * @return array
+     * @inheritDoc
      */
-    private function getDropPrimaryKeyQuery(TableAlterDto $table): array
+    protected function getDropPrimaryKeyClause(TableAlterDto $table): array
     {
-        if (!$table->primaryKeyChanged()) {
+        if (!$this->primaryKeyChanged($table)) {
             return [];
         }
 
         // Use the previous table name.
-        $constraintName = "{$table->statusName()}_pkey";
+        $tableName = $table->statusName();
+        // Find the primary key index.
+        $indexes = array_filter($this->_engine()->indexes($tableName),
+            fn(IndexDto $index) => $index->type === 'PRIMARY');
+        $primaryIndex = array_values($indexes)[0] ?? null;
+        if ($primaryIndex !== null) {
+            $constraintName = $this->_statement()->escapeId($primaryIndex->name);
+            return ["DROP CONSTRAINT $constraintName"];
+        }
+
+        $constraintName = "{$tableName}_pkey";
         $constraintName = $this->_statement()->escapeId($constraintName);
-        $tableName = $this->_statement()->escapeTableName($table->statusName());
-        return ["ALTER TABLE $tableName DROP CONSTRAINT $constraintName"];
+        return ["DROP CONSTRAINT $constraintName"];
+    }
+
+    /**
+    * @inheritDoc
+     */
+    protected function getDeleteForeignKeyClauses(TableAlterDto $table): array
+    {
+        $filter = fn(ForeignKeyDdDto $foreignKey) =>
+            $foreignKey->edited() || $foreignKey->dropped();
+        $foreignKeys = array_filter($table->foreignKeys, $filter);
+        $formatter = fn(ForeignKeyDdDto $foreignKey) =>
+            'DROP CONSTRAINT ' . $this->_statement()->escapeId($foreignKey->name);
+        return array_map($formatter, $foreignKeys);
     }
 
     /**
@@ -297,7 +301,7 @@ class Table extends AbstractTable
             ...$this->getEditColumnClauses($table),
             ...$this->getDropColumnClauses($table),
             ...$this->getCreatePrimaryKeyClause($table, 'ADD '),
-            ...$this->getForeignKeyClauses($table, 'ADD '),
+            ...$this->getCreateForeignKeyClauses($table, 'ADD '),
         ];
         if (count($clauses) === 0) {
             return [];
@@ -313,11 +317,11 @@ class Table extends AbstractTable
     public function getAlterTableQueries(TableAlterDto $table): array
     {
         if ($table->name === '') {
-            throw new Exception($this->_utils()->lang('The table name must be defined.'));
+            throw new DbException($this->_utils()->lang('The table name must be defined.'));
         }
 
         return [
-            ...$this->getDropPrimaryKeyQuery($table),
+            ...$this->getDropConstraintsQuery($table),
             ...$this->getRemovedAutoIncrementQueries($table),
             ...$this->getRenameQueries($table),
             ...$this->getAlterTableQuery($table),
