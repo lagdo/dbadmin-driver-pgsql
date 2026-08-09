@@ -17,7 +17,7 @@
     },
     "require": {
         "php": ">=8.1.0",
-        "lagdo/dbadmin-driver": "0.22.*"
+        "lagdo/dbadmin-driver": "0.23.*"
     },
     "require-dev": {
         "ext-pdo": "*",
