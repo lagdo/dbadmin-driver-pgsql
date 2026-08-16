@@ -174,7 +174,7 @@ class Connection extends AbstractConnection
         [$params, $query] = $this->getPreparedParams($query, $replace);
         // The prepared statement needs a unique name.
         $name = uniqid('st');
-        $statement = pg_prepare($this->client, $name, $query);
+        $statement = @pg_prepare($this->client, $name, $query);
         return new PreparedStatement($statement, $query, $params, $name);
     }
 
@@ -192,7 +192,7 @@ class Connection extends AbstractConnection
         }
 
         $values = $preparedStatement->paramValues($values, false);
-        $result = pg_execute($this->client, $preparedStatement->name(), $values);
+        $result = @pg_execute($this->client, $preparedStatement->name(), $values);
         if ($result === false) {
             $this->setError(pg_last_error($this->client));
         }
