@@ -176,15 +176,15 @@ AND specific_name = $quotedName ORDER BY ordinal_position";
      */
     public function routines(): array
     {
-        $query = "SELECT specific_name AS SPECIFIC_NAME, routine_type AS ROUTINE_TYPE,
-routine_name AS ROUTINE_NAME, type_udt_name AS DTD_IDENTIFIER
+        $query = "SELECT specific_name, routine_type,
+routine_name, type_udt_name AS dtd_identifier
 FROM information_schema.routines WHERE routine_schema = current_schema()
 ORDER BY SPECIFIC_NAME";
         $rows = $this->_engine()->rows($query);
         // The ROUTINE_TYPE column can have NULL as value
         return array_map(fn($row) =>
-            new RoutineDto($row['ROUTINE_NAME'], $row['SPECIFIC_NAME'],
-                $row['ROUTINE_TYPE'] ?: '', $row['DTD_IDENTIFIER']), $rows);
+            new RoutineDto($row['routine_name'], $row['specific_name'],
+                $row['routine_type'] ?: '', $row['dtd_identifier']), $rows);
     }
 
     /**

@@ -7,6 +7,7 @@ use Lagdo\DbAdmin\Driver\Sql\Dto\ColumnDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\ForeignKeyDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\IndexDto;
 use Lagdo\DbAdmin\Driver\Sql\Dto\TableDto;
+use Lagdo\DbAdmin\Driver\Sql\Dto\TriggerDto;
 
 use function array_filter;
 use function array_keys;
@@ -342,8 +343,7 @@ ADD CONSTRAINT $constraint {$foreignKey->definition} $deferrable;";
     {
         $status = $this->_engine()->tableStatus($table);
         $triggers = array_values($this->_engine()->triggers($table));
-        $triggers = array_map(function(string $triggerId) use($status) {
-            $trigger = $this->_engine()->trigger($triggerId, $status->name);
+        $triggers = array_map(function(TriggerDto $trigger) use($status) {
             $triggerName = $this->_statement()->escapeId($trigger->name);
             $statusName = $this->_statement()->escapeId($status->name);
             $schema = $this->_statement()->escapeId($status->schema);
