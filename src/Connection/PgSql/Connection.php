@@ -13,6 +13,7 @@ use PgSql\Result as PgResult;
 use function addcslashes;
 use function pg_affected_rows;
 use function pg_connect;
+use function pg_close;
 use function pg_escape_bytea;
 use function pg_escape_string;
 use function pg_last_error;
@@ -36,9 +37,9 @@ class Connection extends AbstractConnection
     /**
      * The client object used to query the database driver
      *
-     * @var PgConnection|bool
+     * @var PgConnection|null
      */
-    protected PgConnection|bool $client;
+    protected PgConnection|null $client = null;
 
     /**
      * @var int
@@ -57,18 +58,19 @@ class Connection extends AbstractConnection
 
         $connString = sprintf("host='%s' user='%s' password='%s' dbname='%s' connect_timeout=2",
             $server, $username, $password, $database);
-        $this->client = @pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
-        // if (!$this->client && $database != "") {
+        $client = @pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
+        // if (!$client && $database != "") {
         //     // try to connect directly with database for performance
         //     $this->_database = false;
-        //     $this->client = pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
+        //     $client = pg_connect("{$this->_string} dbname='postgres'", PGSQL_CONNECT_FORCE_NEW);
         // }
 
-        if (!$this->client) {
+        if (!$client) {
             $this->setError($this->_utils()->lang('Unable to connect to database server.'));
             return false;
         }
 
+        $this->client = $client;
         if ($this->_engine()->minVersion(9, 0)) {
             if (@pg_query($this->client, "SET application_name = 'Jaxon DbAdmin'") === false) {
                 $this->setError(pg_last_error($this->client));
@@ -81,6 +83,17 @@ class Connection extends AbstractConnection
         }
         pg_set_client_encoding($this->client, "UTF8");
         return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function close(): void
+    {
+        if ($this->client !== null) {
+            pg_close($this->client);
+            $this->client = null;
+        }
     }
 
     /**
@@ -118,14 +131,6 @@ class Connection extends AbstractConnection
     public function quoteBinary(string $string): string
     {
         return "'" . pg_escape_bytea($this->client, $string) . "'";
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function close(): void
-    {
-        // $this->client = pg_connect("{$this->_string} dbname='postgres'");
     }
 
     /**
